@@ -47,6 +47,10 @@ $logos = [System.Collections.Generic.List[hashtable]]::new()
 foreach ($group in $data.groups) {
     if ($group.tier -notin $Config.stampGame.tiers) { continue }
     foreach ($sponsor in $group.sponsors) {
+        if ($sponsor.name -in $Config.stampGame.excludeSponsors) {
+            Write-Host "  Skipping (excluded): $($sponsor.name)" -ForegroundColor DarkGray
+            continue
+        }
         $logoUrl = "$rawBase/static/$($sponsor.logo)"
         try {
             $raw      = (Invoke-WebRequest -Uri $logoUrl -UseBasicParsing).Content
@@ -115,6 +119,15 @@ if ($sqrtN * $sqrtN -eq $n) {
 
 $gridCells = $cellList -join ""
 
+# Compute row height to fill available card height without overflowing.
+# Page is 8in tall (landscape Letter minus .25in margins each side).
+# Header area (h2 + instructions + name-row) takes ~0.75in; gaps between rows = (rows-1)*0.1in.
+$totalRows   = [int][Math]::Ceiling([double]$cellList.Count / $cols)
+$gridGapsIn  = ($totalRows - 1) * 0.1
+$rowHeight   = [Math]::Round((8.0 - 0.75 - $gridGapsIn) / $totalRows, 2)
+if ($rowHeight -gt 1.4) { $rowHeight = 1.4 }
+$rowHeightStr = "${rowHeight}in"
+
 $eventName = $Config.event.name
 
 $cardHtml = @"
@@ -152,7 +165,7 @@ $html = @"
   .grid {
     display: grid;
     grid-template-columns: repeat($cols, 1fr);
-    grid-auto-rows: 1.4in;
+    grid-auto-rows: $rowHeightStr;
     align-content: start;
     gap: .1in;
   }

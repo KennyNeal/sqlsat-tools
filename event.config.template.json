@@ -31,6 +31,7 @@
   },
   "stampGame": {
     "tiers": ["global", "platinum", "facility", "gold", "silver", "bronze"],
+    "excludeSponsors": [],
     "gridColumns": 3,
     "freeSpaceLogoFile": "",
     "outputFile": "./output/stamp-game.pdf"
