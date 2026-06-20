@@ -1,27 +1,21 @@
 {
   "event": {
-    "name": "Day of Data Baton Rouge 2026",
-    "hashtag": "#DayOfDataBR",
-    "year": "2026",
-    "sessionizeUrl": "https://sessionize.com/dayofdatabr26"
+    "hashtag": "#YourHashtag"
   },
   "websiteRepo": {
-    "owner": "KennyNeal",
-    "name": "sqlsatbr-website",
+    "owner": "YourGitHubOrg",
+    "name": "your-website-repo",
     "branch": "main",
-    "sponsorDataFile": "dodbr-2026"
+    "eventKey": "your-event-key"
   },
   "eventbrite": {
     "eventId": "",
     "secretName": "EventbriteToken"
   },
-  "sessionize": {
-    "eventId": "ocxfgd65"
-  },
   "email": {
     "secretName": "SQLSaturday-Gmail",
-    "subject": "See You at Day of Data Baton Rouge 2026!",
-    "fromName": "Day of Data Baton Rouge",
+    "subject": "See You at the Event!",
+    "fromName": "",
     "batchSize": 50,
     "delaySeconds": 2
   },

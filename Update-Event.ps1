@@ -46,6 +46,9 @@ if (-not (Test-Path $ConfigPath)) {
 }
 $config = Get-Content $ConfigPath | ConvertFrom-Json
 
+. "$PSScriptRoot\scripts\Resolve-EventConfig.ps1"
+$config = Resolve-EventConfig -Config $config
+
 function Confirm-Step {
     param([string]$Description)
     if ($StepThrough) {

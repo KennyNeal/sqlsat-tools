@@ -15,6 +15,9 @@ param(
     [PSCustomObject]$Config
 )
 
+. "$PSScriptRoot\Resolve-EventConfig.ps1"
+$Config = Resolve-EventConfig -Config $Config
+
 $sessionizeId = $Config.sessionize.eventId
 $outputFile   = Join-Path $PSScriptRoot ".." $Config.schedule.outputFile
 $outputDir    = Split-Path $outputFile

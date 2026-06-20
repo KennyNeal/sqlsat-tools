@@ -56,18 +56,20 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 
 | Key | Description |
 |---|---|
-| `event.name` | Full event name used in emails and printouts |
-| `event.hashtag` | Social media hashtag |
-| `websiteRepo.*` | GitHub owner/repo/branch of the website repo |
-| `websiteRepo.sponsorDataFile` | YAML filename under `data/sponsors/` (no extension) |
+| `event.hashtag` | Social media hashtag (e.g. `#DayOfDataBR`) |
+| `websiteRepo.owner` | GitHub org or user that owns the website repo |
+| `websiteRepo.name` | GitHub repo name |
+| `websiteRepo.branch` | Branch to read from (usually `main`) |
+| `websiteRepo.eventKey` | Folder under `content/events/` in the website repo (e.g. `dodbr-2026`). Event name, Sessionize ID, sponsor data file, and event logo are all read from that folder's `_index.md` at runtime. |
 | `eventbrite.eventId` | Numeric EventBrite event ID (find it in the organizer dashboard URL) |
 | `eventbrite.secretName` | SecretManagement secret name for the API token |
-| `sessionize.eventId` | Sessionize event slug (from `sessionize.com/api/v2/{id}/view/All`) |
 | `email.secretName` | SecretManagement secret name for Gmail credentials |
 | `email.subject` | Email subject line |
+| `email.fromName` | Display name in the From header |
 | `speedpass.raffleTiers` | Sponsor tiers that get a raffle slip (e.g., `["global","platinum","gold","silver"]`) |
 | `stampGame.tiers` | Sponsor tiers that appear on the stamp game card |
-| `stampGame.gridColumns` | Number of columns in the stamp card grid |
+| `stampGame.excludeSponsors` | Sponsor names to skip even if they match a listed tier |
+| `stampGame.gridColumns` | Number of columns in the stamp card grid (overridden automatically when logo count is a perfect square) |
 
 ---
 

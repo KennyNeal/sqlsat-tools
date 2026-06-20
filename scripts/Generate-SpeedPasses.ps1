@@ -34,6 +34,9 @@ if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
 }
 Import-Module powershell-yaml
 
+. "$PSScriptRoot\Resolve-EventConfig.ps1"
+$Config = Resolve-EventConfig -Config $Config
+
 $dbPath      = Join-Path $PSScriptRoot ".." $Config.database.path
 $outputDir   = Join-Path $PSScriptRoot ".." $Config.speedpass.outputDir
 $libPath     = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"

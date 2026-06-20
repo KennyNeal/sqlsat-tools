@@ -23,6 +23,9 @@ if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
 }
 Import-Module powershell-yaml
 
+. "$PSScriptRoot\Resolve-EventConfig.ps1"
+$Config = Resolve-EventConfig -Config $Config
+
 $cols       = if ($GridColumns -gt 0) { $GridColumns } else { $Config.stampGame.gridColumns }
 $outputFile = Join-Path $PSScriptRoot ".." $Config.stampGame.outputFile
 $outputDir  = Split-Path $outputFile
@@ -71,6 +74,11 @@ foreach ($group in $data.groups) {
     }
 }
 
+# ── Resolve free-space logo ───────────────────────────────────────────────────
+
+. "$PSScriptRoot\Get-EventLogo.ps1"
+$eventLogo = Get-EventLogo -Config $Config -Override $Config.stampGame.freeSpaceLogoFile
+
 # ── Build HTML ────────────────────────────────────────────────────────────────
 
 $cellList = [System.Collections.Generic.List[string]]::new()
@@ -94,21 +102,9 @@ if ($sqrtN * $sqrtN -eq $n) {
 } elseif ($sqrtN1 * $sqrtN1 -eq ($n + 1)) {
     # Adding one free space makes a perfect square — insert it at center
     $cols = $sqrtN1
-    $freeInner    = ""
-    $freeLogoFile = $Config.stampGame.freeSpaceLogoFile
-    if ($freeLogoFile) {
-        try {
-            $raw   = (Invoke-WebRequest -Uri "$rawBase/static/$freeLogoFile" -UseBasicParsing).Content
-            $bytes = if ($raw -is [string]) { [System.Text.Encoding]::UTF8.GetBytes($raw) } else { $raw }
-            $b64   = [Convert]::ToBase64String($bytes)
-            $ext   = [System.IO.Path]::GetExtension($freeLogoFile).TrimStart('.')
-            $mime  = switch ($ext) { 'svg' { 'image/svg+xml' } 'jpg' { 'image/jpeg' } 'jpeg' { 'image/jpeg' } default { "image/$ext" } }
-            $freeInner = '<img src="data:' + $mime + ';base64,' + $b64 + '" alt="' + $Config.event.name + '"/>'
-            Write-Host "  Loaded free-space logo: $freeLogoFile" -ForegroundColor DarkGray
-        } catch {
-            Write-Host "  Warning: could not load free-space logo: $_" -ForegroundColor Yellow
-        }
-    }
+    $freeInner = if ($eventLogo) {
+        '<img src="data:' + $eventLogo.Mime + ';base64,' + $eventLogo.Base64 + '" alt="' + $Config.event.name + '"/>'
+    } else { "" }
     $freeCell = '<div class="cell free-space">' + $freeInner + '<div class="free-label">FREE</div></div>'
     $cellList.Insert([Math]::Floor($n / 2), $freeCell)
 } else {
