@@ -4,9 +4,8 @@
 .DESCRIPTION
     Fetches content/events/{eventKey}/_index.md from the website repo and merges
     the following fields into the config object at runtime:
-      event.name        ← title
+      event.name         ← title
       sessionize.eventId ← sessionizeId
-      websiteRepo.sponsorDataFile ← sponsorsKey
 
     Call this once at the top of any script that needs these fields.
     The config key websiteRepo.eventKey is the only required bootstrap value.
@@ -34,10 +33,8 @@ function Resolve-EventConfig {
 
     $title        = Get-Field 'title'
     $sessionizeId = Get-Field 'sessionizeId'
-    $sponsorsKey  = Get-Field 'sponsorsKey'
 
-    if ($title)       { $Config.event | Add-Member -NotePropertyName 'name' -NotePropertyValue $title -Force }
-    if ($sponsorsKey) { $Config.websiteRepo | Add-Member -NotePropertyName 'sponsorDataFile' -NotePropertyValue $sponsorsKey -Force }
+    if ($title) { $Config.event | Add-Member -NotePropertyName 'name' -NotePropertyValue $title -Force }
 
     if ($sessionizeId) {
         if ($Config.PSObject.Properties['sessionize']) {

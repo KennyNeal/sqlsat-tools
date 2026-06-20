@@ -58,7 +58,7 @@ function Get-SponsorLogos {
 
     $repo   = $Config.websiteRepo
     $rawBase = "https://raw.githubusercontent.com/$($repo.owner)/$($repo.name)/$($repo.branch)"
-    $yamlUrl = "$rawBase/data/sponsors/$($repo.sponsorDataFile).yaml"
+    $yamlUrl = "$rawBase/content/events/$($repo.eventKey)/sponsors.yaml"
 
     Write-Host "  Fetching sponsor data from $yamlUrl" -ForegroundColor Cyan
     $yaml = (Invoke-RestMethod -Uri $yamlUrl -Method Get)
