@@ -58,7 +58,6 @@ foreach ($group in $data.groups) {
                 'jpeg' { 'image/jpeg' }
                 default { "image/$ext" }
             }
-            $fit = if ($sponsor.logoFit -eq 'extra-wide') { 'contain' } else { 'contain' }
             $logos.Add(@{ Name = $sponsor.name; Base64 = $b64; Mime = $mimeType })
             Write-Host "  $($sponsor.name)" -ForegroundColor DarkGray
         } catch {
@@ -80,7 +79,6 @@ foreach ($logo in $logos) {
 }
 
 $eventName = $Config.event.name
-$hashtag   = $Config.event.hashtag
 
 $html = @"
 <html><head>

@@ -237,13 +237,10 @@ Write-Host "Loading sponsor logos for raffle tiers: $($Config.speedpass.raffleTi
 $sponsorLogos = Get-SponsorLogos -Config $Config -Tiers $Config.speedpass.raffleTiers
 
 # Query attendees
-$whereClause = if ($Email) {
-    "WHERE a.Email = @Email AND p.SpeedPassGeneratedAt IS NULL"
-} elseif ($Force) {
-    ""
-} else {
-    "WHERE p.SpeedPassGeneratedAt IS NULL"
-}
+$emailFilter = if ($Email) { "a.Email = @Email" } else { $null }
+$nullFilter  = if (-not $Force) { "p.SpeedPassGeneratedAt IS NULL" } else { $null }
+$conditions  = @($emailFilter, $nullFilter) | Where-Object { $_ }
+$whereClause = if ($conditions) { "WHERE " + ($conditions -join " AND ") } else { "" }
 
 $query = @"
 SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle,

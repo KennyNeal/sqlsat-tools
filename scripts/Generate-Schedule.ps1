@@ -39,6 +39,8 @@ $bySlot = $data.sessions | Where-Object { -not $_.isServiceSession } |
 $eventName = $Config.event.name
 $hashtag   = $Config.event.hashtag
 
+Add-Type -AssemblyName System.Web
+
 $rows = ""
 foreach ($slot in $bySlot) {
     $time     = [datetime]$slot.Name
@@ -74,8 +76,6 @@ foreach ($slot in $bySlot) {
 $rooms = $data.sessions | Where-Object { -not $_.isServiceSession } |
     ForEach-Object { $roomMap[$_.roomId] } | Select-Object -Unique | Sort-Object
 $headerCells = ($rooms | ForEach-Object { "<th>$_</th>" }) -join ""
-
-Add-Type -AssemblyName System.Web
 
 $html = @"
 <!DOCTYPE html>

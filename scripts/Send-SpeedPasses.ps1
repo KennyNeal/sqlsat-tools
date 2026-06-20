@@ -35,8 +35,9 @@ $delaySeconds    = $Config.email.delaySeconds
 
 # Load email credentials
 try {
-    $cred = Get-Secret -Name $Config.email.secretName -AsPlainText:$false -ErrorAction Stop
-    $from = $cred.UserName
+    $cred      = Get-Secret -Name $Config.email.secretName -AsPlainText:$false -ErrorAction Stop
+    $fromName  = $Config.email.fromName
+    $from      = if ($fromName) { "$fromName <$($cred.UserName)>" } else { $cred.UserName }
 } catch {
     throw "Could not load Gmail credentials from secret '$($Config.email.secretName)'. Run: Set-Secret -Name '$($Config.email.secretName)' -Secret (Get-Credential)"
 }

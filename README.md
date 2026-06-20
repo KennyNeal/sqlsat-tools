@@ -9,7 +9,7 @@ the sponsor stamp game card — all driven by a single config file.
 ```
 1. Copy event.config.template.json → event.config.json
 2. Fill in your credentials and event IDs (see Config reference below)
-3. Run: .\Initialize-Database.ps1 -Config (gc event.config.json | ConvertFrom-Json)
+3. Run: .\scripts\Initialize-Database.ps1 -Config (Get-Content event.config.json | ConvertFrom-Json)
 4. Run: .\Update-Event.ps1
 ```
 
@@ -60,7 +60,6 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `event.hashtag` | Social media hashtag |
 | `websiteRepo.*` | GitHub owner/repo/branch of the website repo |
 | `websiteRepo.sponsorDataFile` | YAML filename under `data/sponsors/` (no extension) |
-| `websiteRepo.eventContentPath` | Path to the event's `_index.md` in the website repo |
 | `eventbrite.eventId` | Numeric EventBrite event ID (find it in the organizer dashboard URL) |
 | `eventbrite.secretName` | SecretManagement secret name for the API token |
 | `sessionize.eventId` | Sessionize event slug (from `sessionize.com/api/v2/{id}/view/All`) |

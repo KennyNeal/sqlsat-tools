@@ -9,8 +9,7 @@
     "owner": "KennyNeal",
     "name": "sqlsatbr-website",
     "branch": "main",
-    "sponsorDataFile": "dodbr-2026",
-    "eventContentPath": "content/events/dodbr-2026/_index.md"
+    "sponsorDataFile": "dodbr-2026"
   },
   "eventbrite": {
     "eventId": "",
