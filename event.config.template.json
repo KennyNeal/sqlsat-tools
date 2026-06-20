@@ -32,6 +32,7 @@
   "stampGame": {
     "tiers": ["global", "platinum", "facility", "gold", "silver", "bronze"],
     "gridColumns": 3,
+    "freeSpaceLogoFile": "",
     "outputFile": "./output/stamp-game.pdf"
   },
   "schedule": {

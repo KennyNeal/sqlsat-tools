@@ -68,7 +68,8 @@ function Get-SponsorLogos {
             $logoUrl = "$rawBase/static/$($sponsor.logo)"
             Write-Host "    Downloading: $($sponsor.name)" -ForegroundColor DarkGray
             try {
-                $bytes    = (Invoke-WebRequest -Uri $logoUrl -UseBasicParsing).Content
+                $raw      = (Invoke-WebRequest -Uri $logoUrl -UseBasicParsing).Content
+                $bytes    = if ($raw -is [string]) { [System.Text.Encoding]::UTF8.GetBytes($raw) } else { $raw }
                 $b64      = [Convert]::ToBase64String($bytes)
                 $ext      = [System.IO.Path]::GetExtension($sponsor.logo).TrimStart('.')
                 $mimeType = switch ($ext) {
