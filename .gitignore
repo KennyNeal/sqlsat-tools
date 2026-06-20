@@ -1,0 +1,5 @@
+event.config.json
+event.db
+output/
+*.xml
+*.log
