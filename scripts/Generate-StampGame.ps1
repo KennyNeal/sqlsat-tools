@@ -92,24 +92,23 @@ foreach ($logo in $logos) {
 }
 
 $n      = $cellList.Count
-$sqrtN  = [int][Math]::Round([Math]::Sqrt($n))
-$sqrtN1 = [int][Math]::Round([Math]::Sqrt($n + 1))
+$sqrtN     = [int][Math]::Round([Math]::Sqrt($n))
 $emptyCell = '<div class="cell empty"><div class="stamp-area" style="width:85%;flex:1;margin:.04in 0"></div></div>'
+$totalCells = [int]([Math]::Ceiling([double]$n / $cols) * $cols)
 
 if ($sqrtN * $sqrtN -eq $n) {
-    # Already a perfect square — no padding needed, snap cols to match
+    # Already a perfect square — snap cols to match, no padding needed
     $cols = $sqrtN
-} elseif ($sqrtN1 * $sqrtN1 -eq ($n + 1)) {
-    # Adding one free space makes a perfect square — insert it at center
-    $cols = $sqrtN1
+    $totalCells = $n
+} elseif ($totalCells - $n -eq 1) {
+    # Exactly one empty slot — place the free space in the center instead
     $freeInner = if ($eventLogo) {
         '<img src="data:' + $eventLogo.Mime + ';base64,' + $eventLogo.Base64 + '" alt="' + $Config.event.name + '"/>'
     } else { "" }
     $freeCell = '<div class="cell free-space">' + $freeInner + '<div class="free-label">FREE</div></div>'
-    $cellList.Insert([Math]::Floor($n / 2), $freeCell)
+    $cellList.Insert([Math]::Floor($totalCells / 2), $freeCell)
 } else {
-    # Not a perfect square either way — pad end with empty stamp squares
-    $totalCells = [int]([Math]::Ceiling([double]$n / $cols) * $cols)
+    # Multiple empty slots — pad end with blank stamp squares
     while ($cellList.Count -lt $totalCells) { $cellList.Add($emptyCell) }
 }
 
