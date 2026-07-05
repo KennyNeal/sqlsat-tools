@@ -35,5 +35,9 @@
   },
   "database": {
     "path": "./event.db"
+  },
+  "badge": {
+    "backgroundImage": "./assets/badge-background.png",
+    "outputFile": "./output/badges.pdf"
   }
 }
