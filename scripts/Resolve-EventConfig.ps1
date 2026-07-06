@@ -5,7 +5,9 @@
     Fetches content/events/{eventKey}/_index.md from the website repo and merges
     the following fields into the config object at runtime:
       event.name         ← title
-      sessionize.eventId ← sessionizeId
+      sessionize.eventId ← sessionizeId (fallback only — local config wins,
+                           since the website ID is a JS embed endpoint and
+                           the tools need a JSON endpoint)
 
     Call this once at the top of any script that needs these fields.
     The config key websiteRepo.eventKey is the only required bootstrap value.
@@ -36,11 +38,14 @@ function Resolve-EventConfig {
 
     if ($title) { $Config.event | Add-Member -NotePropertyName 'name' -NotePropertyValue $title -Force }
 
+    # The website's sessionizeId is a JavaScript embed endpoint; the tools need a
+    # JSON endpoint. Only fall back to the website's ID when the local config
+    # doesn't provide sessionize.eventId (the JSON endpoint) itself.
     if ($sessionizeId) {
-        if ($Config.PSObject.Properties['sessionize']) {
-            $Config.sessionize | Add-Member -NotePropertyName 'eventId' -NotePropertyValue $sessionizeId -Force
-        } else {
+        if (-not $Config.PSObject.Properties['sessionize']) {
             $Config | Add-Member -NotePropertyName 'sessionize' -NotePropertyValue ([PSCustomObject]@{ eventId = $sessionizeId })
+        } elseif (-not $Config.sessionize.eventId) {
+            $Config.sessionize | Add-Member -NotePropertyName 'eventId' -NotePropertyValue $sessionizeId -Force
         }
     }
 
