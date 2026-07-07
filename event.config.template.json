@@ -40,6 +40,12 @@
     "backgroundImage": "./assets/dod_badge_labelfit.png",
     "outputFile": "./output/badges.pdf"
   },
+  "slideTemplate": {
+    "footerText": "NO FOOD OR DRINKS IN THE CLASSROOMS",
+    "primaryColor": "013169",
+    "secondaryColor": "F7C15D",
+    "outputFile": "./output/SlideTemplate.potx"
+  },
   "sessionize": {
     "eventId": "6zprekde"
   }
