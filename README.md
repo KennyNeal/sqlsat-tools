@@ -22,7 +22,8 @@ That's it. Re-run `Update-Event.ps1` daily as new registrations come in.
 | Requirement | Notes |
 |---|---|
 | PowerShell 7+ | Recommended |
-| Microsoft Edge | Used for headless PDF generation |
+| Microsoft Edge | Used for headless PDF generation, and to rasterize SVG sponsor logos for the slide template |
+| Python 3 | Used by `Generate-SlideTemplate.ps1`; `python-pptx` and `Pillow` are installed automatically on first run |
 | `PSSQLite` module | Installed automatically on first run |
 | `powershell-yaml` module | Installed automatically on first run |
 | `Microsoft.PowerShell.SecretManagement` | For storing credentials securely |
@@ -70,6 +71,9 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `stampGame.tiers` | Sponsor tiers that appear on the stamp game card |
 | `stampGame.excludeSponsors` | Sponsor names to skip even if they match a listed tier |
 | `stampGame.gridColumns` | Number of columns in the stamp card grid (overridden automatically when logo count is a perfect square) |
+| `slideTemplate.footerText` | Text shown in the bottom bar of the title and sponsor slides (e.g. a room policy reminder) |
+| `slideTemplate.primaryColor` / `slideTemplate.secondaryColor` | Hex brand colors for the header/footer bars and slide text |
+| `slideTemplate.outputFile` | Where the generated `.potx` is written |
 
 ---
 
@@ -106,6 +110,10 @@ $config = Get-Content .\event.config.json | ConvertFrom-Json
 
 # Paper schedule (run once sessions are published on Sessionize)
 .\scripts\Generate-Schedule.ps1 -Config $config
+
+# Presenter slide-deck template — title, sponsor thank-you, and eval slides
+# (run once sponsors are finalized; re-run any time the sponsor roster changes)
+.\scripts\Generate-SlideTemplate.ps1 -Config $config
 
 # Walk-in label printer (stub — not yet implemented)
 .\scripts\Generate-NameTag.ps1 -Config $config -Email "walkin@example.com"
@@ -153,9 +161,13 @@ sqlsat-tools/
 │   ├── Send-SpeedPasses.ps1
 │   ├── Generate-StampGame.ps1
 │   ├── Generate-Schedule.ps1
+│   ├── Generate-SlideTemplate.ps1
+│   ├── generate_slide_template.py
 │   └── Generate-NameTag.ps1      ← stub (Brother QL-820NWB)
 ├── templates/
 │   └── attendee-email.html
+├── assets/
+│   └── brug-logo.png             ← static org logo used on the eval slide
 ├── lib/
 │   └── QRCoder.dll
 └── output/                       ← gitignored; generated files
