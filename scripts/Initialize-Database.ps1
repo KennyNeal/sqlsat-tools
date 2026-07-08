@@ -50,4 +50,12 @@ CREATE TABLE IF NOT EXISTS ProcessedAttendees (
 )
 "@
 
+Invoke-SqliteQuery -DataSource $dbPath -Query @"
+CREATE TABLE IF NOT EXISTS PrintedBadges (
+    Barcode    TEXT PRIMARY KEY,
+    PrintedAt  TEXT DEFAULT (datetime('now')),
+    PrintedBy  TEXT
+)
+"@
+
 Write-Host "Database ready: $dbPath" -ForegroundColor Green

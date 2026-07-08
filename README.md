@@ -132,8 +132,24 @@ $config = Get-Content .\event.config.json | ConvertFrom-Json
 # (run once sponsors are finalized; re-run any time the sponsor roster changes)
 .\scripts\Generate-RaffleDeck.ps1 -Config $config
 
-# Walk-in label printer (stub — not yet implemented)
-.\scripts\Generate-NameTag.ps1 -Config $config -Email "walkin@example.com"
+# Pre-print badge sheets in bulk (Avery 5392, 4"x3", 6-up)
+.\scripts\Generate-NameTag.ps1 -Config $config
+
+# Day-of registration / walk-ins: look up by order # or email, prints a
+# single 2.4"x3.9" label (no background art) straight to the Brother
+# QL-820NWB via SumatraPDF, for sticking onto pre-printed blank badges.
+# With no -OrderId/-Email it loops, prompting for the next lookup, so one
+# launch can serve the whole registration desk. Unknown order#/email
+# triggers a quick-add prompt to register a true walk-in on the spot.
+# Quick-added walk-ins are LOCAL ONLY (Eventbrite's API can't create real
+# orders/attendees) — see List-UnsyncedWalkins.ps1 below.
+.\scripts\Print-WalkinBadge.ps1 -Config $config
+.\scripts\Print-WalkinBadge.ps1 -Config $config -Email "jane.doe@example.com"
+.\scripts\Print-WalkinBadge.ps1 -Config $config -OrderId "123456789"
+
+# See who was quick-added at the desk but still needs a matching free/comp
+# order created in Eventbrite (dashboard or Box Office app) to stay in sync.
+.\scripts\List-UnsyncedWalkins.ps1 -Config $config
 ```
 
 ---
@@ -149,12 +165,13 @@ picks up the changes automatically — no manual sync needed.
 
 ## Database
 
-`event.db` is a local SQLite file (gitignored). Two tables:
+`event.db` is a local SQLite file (gitignored). Three tables:
 
 | Table | Purpose |
 |---|---|
-| `Attendees` | Upserted on every import — holds all registrant data |
+| `Attendees` | Upserted on every import — holds all registrant data. Walk-ins added via `Print-WalkinBadge.ps1` get `TicketType = 'Walk-in'` and an `OrderId` of `WALKIN` |
 | `ProcessedAttendees` | Tracks `SpeedPassGeneratedAt` and `EmailedAt` per attendee |
+| `PrintedBadges` | Tracks `PrintedAt`/`PrintedBy` per attendee for the day-of badge printer, so staff can see reprint status at the desk |
 
 Reset an attendee's status (to regenerate + re-email):
 ```sql
@@ -183,7 +200,10 @@ sqlsat-tools/
 │   ├── Generate-RaffleDeck.ps1
 │   ├── generate_raffle_deck.py
 │   ├── slide_helpers.py          ← shared by both slide-deck builders
-│   └── Generate-NameTag.ps1      ← stub (Brother QL-820NWB)
+│   ├── Generate-NameTag.ps1      ← bulk Avery badge sheets
+│   ├── Print-WalkinBadge.ps1     ← day-of/walk-in single-label printing (Brother QL-820NWB)
+│   ├── List-UnsyncedWalkins.ps1  ← walk-ins not yet registered in Eventbrite
+│   └── Badge-Helpers.ps1         ← shared by both badge scripts (vCard/QR/PDF/print)
 ├── templates/
 │   └── attendee-email.html
 ├── assets/

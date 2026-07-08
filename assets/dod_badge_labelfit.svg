@@ -1,0 +1,30 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      .display { font-family: 'Lato'; font-weight: 900; }
+      .body    { font-family: 'Lato'; font-weight: 700; }
+      .mono    { font-family: 'JetBrains Mono'; font-weight: 700; }
+    </style>
+  </defs>
+
+  <!-- base: white (adhesive label area) -->
+  <rect width="1200" height="900" fill="#FFFFFF"/>
+
+  <!-- header band: navy -->
+  <rect x="0" y="0" width="1200" height="300" fill="#003269"/>
+  <rect x="0" y="300" width="1200" height="10" fill="#F7C15D"/>
+
+  <!-- official logo -->
+  <image x="50" y="30" width="240" height="240" xlink:href="dayofdata-logo.png"/>
+
+  <!-- event name -->
+  <text x="330" y="155" class="display" font-size="94" fill="#FFF6E9" letter-spacing="1">DAY OF DATA</text>
+  <text x="333" y="230" class="body" font-size="44" fill="#F7C15D" letter-spacing="10">BATON ROUGE 2026</text>
+
+  <!-- footer band: gold -->
+  <rect x="0" y="790" width="1200" height="110" fill="#F7C15D"/>
+  <polyline points="0,870 120,850 260,862 400,838 540,852 680,826 820,842 960,818 1100,834 1200,814"
+            fill="none" stroke="#003269" stroke-width="4" opacity="0.25"/>
+  <text x="60" y="857" class="mono" font-size="34" fill="#003269">SAT · JULY 18, 2026</text>
+  <text x="1140" y="857" class="mono" font-size="30" fill="#003269" text-anchor="end">LSU BUSINESS EDUCATION COMPLEX</text>
+</svg>

@@ -38,7 +38,8 @@
   },
   "badge": {
     "backgroundImage": "./assets/dod_badge_labelfit.png",
-    "outputFile": "./output/badges.pdf"
+    "outputFile": "./output/badges.pdf",
+    "walkinPrinter": "Brother QL-820NWB"
   },
   "raffleDeck": {
     "loopAdvanceSeconds": 8,
