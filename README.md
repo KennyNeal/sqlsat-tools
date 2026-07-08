@@ -141,9 +141,15 @@ $config = Get-Content .\event.config.json | ConvertFrom-Json
 # With no -OrderId/-Email it loops, prompting for the next lookup, so one
 # launch can serve the whole registration desk. Unknown order#/email
 # triggers a quick-add prompt to register a true walk-in on the spot.
+# Quick-added walk-ins are LOCAL ONLY (Eventbrite's API can't create real
+# orders/attendees) — see List-UnsyncedWalkins.ps1 below.
 .\scripts\Print-WalkinBadge.ps1 -Config $config
 .\scripts\Print-WalkinBadge.ps1 -Config $config -Email "jane.doe@example.com"
 .\scripts\Print-WalkinBadge.ps1 -Config $config -OrderId "123456789"
+
+# See who was quick-added at the desk but still needs a matching free/comp
+# order created in Eventbrite (dashboard or Box Office app) to stay in sync.
+.\scripts\List-UnsyncedWalkins.ps1 -Config $config
 ```
 
 ---
@@ -196,6 +202,7 @@ sqlsat-tools/
 │   ├── slide_helpers.py          ← shared by both slide-deck builders
 │   ├── Generate-NameTag.ps1      ← bulk Avery badge sheets
 │   ├── Print-WalkinBadge.ps1     ← day-of/walk-in single-label printing (Brother QL-820NWB)
+│   ├── List-UnsyncedWalkins.ps1  ← walk-ins not yet registered in Eventbrite
 │   └── Badge-Helpers.ps1         ← shared by both badge scripts (vCard/QR/PDF/print)
 ├── templates/
 │   └── attendee-email.html

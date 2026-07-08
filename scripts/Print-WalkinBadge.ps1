@@ -187,6 +187,10 @@ VALUES
         JobTitle  = $jobTitle
     }
 
+    Write-Host "  Added locally only — Eventbrite has no API to create a real registration." -ForegroundColor Yellow
+    Write-Host "  Add a free/comp order in Eventbrite (dashboard or Box Office app) when you get a chance," -ForegroundColor Yellow
+    Write-Host "  or run .\scripts\List-UnsyncedWalkins.ps1 later to see everyone still pending." -ForegroundColor Yellow
+
     return [PSCustomObject]@{
         Barcode   = $barcode
         FirstName = $firstName
