@@ -40,6 +40,14 @@
     "backgroundImage": "./assets/dod_badge_labelfit.png",
     "outputFile": "./output/badges.pdf"
   },
+  "raffleDeck": {
+    "loopAdvanceSeconds": 8,
+    "maxPerGridSlide": 8,
+    "individualTiers": ["global", "platinum"],
+    "gridGroups": [["gold"], ["silver", "bronze"]],
+    "excludeSponsors": [],
+    "outputFile": "./output/RaffleDeck.pptx"
+  },
   "slideTemplate": {
     "footerText": "NO FOOD OR DRINKS IN THE CLASSROOMS",
     "primaryColor": "013169",
