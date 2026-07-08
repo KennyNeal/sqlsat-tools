@@ -3,3 +3,4 @@ event.db
 output/
 *.xml
 *.log
+__pycache__/
