@@ -36,10 +36,6 @@ $outputFile = if ($Config.PSObject.Properties['badge'] -and $Config.badge.output
 }
 $outputDir = Split-Path $outputFile -Parent
 $libPath   = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"
-$edgePaths = @(
-    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-    "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
-)
 
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
@@ -72,43 +68,7 @@ Write-Host "  Loaded badge background: $bgImagePath" -ForegroundColor DarkGray
 if (-not (Test-Path $libPath)) { throw "QRCoder.dll not found at $libPath." }
 Add-Type -Path $libPath
 
-function New-VCard {
-    param($FirstName, $LastName, $Email, $Company, $JobTitle)
-    $lines = @(
-        "BEGIN:VCARD",
-        "VERSION:3.0",
-        "N:$LastName;$FirstName",
-        "FN:$FirstName $LastName"
-    )
-    if ($Company)  { $lines += "ORG:$Company" }
-    if ($JobTitle) { $lines += "TITLE:$JobTitle" }
-    if ($Email)    { $lines += "EMAIL:$Email" }
-    $lines += "END:VCARD"
-    return $lines -join "`r`n"
-}
-
-function New-QRBase64 {
-    param([string]$Data, [int]$PixelSize = 20)
-    $gen    = New-Object QRCoder.QRCodeGenerator
-    $qrData = $gen.CreateQrCode($Data, [QRCoder.QRCodeGenerator+ECCLevel]::L)
-    $qr     = New-Object QRCoder.QRCode($qrData)
-    $bmp    = $qr.GetGraphic($PixelSize)
-    $ms     = New-Object System.IO.MemoryStream
-    $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    $b64    = [Convert]::ToBase64String($ms.ToArray())
-    $ms.Dispose(); $bmp.Dispose(); $qr.Dispose(); $gen.Dispose()
-    return $b64
-}
-
-# ── Edge PDF renderer ─────────────────────────────────────────────────────────
-
-function ConvertTo-Pdf {
-    param([string]$HtmlPath, [string]$PdfPath)
-    $edge = $edgePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-    if (-not $edge) { throw "Microsoft Edge not found." }
-    $null = & $edge --headless=new --print-to-pdf="$PdfPath" --no-margins "file:///$HtmlPath" --disable-gpu --disable-extensions --no-pdf-header-footer 2>&1
-    Start-Sleep -Seconds 5
-}
+. (Join-Path $PSScriptRoot "Badge-Helpers.ps1")
 
 # ── Badge HTML builder ────────────────────────────────────────────────────────
 
@@ -315,7 +275,7 @@ $html      = New-BadgeHtml -Attendees $attendees -BgDataUri $bgDataUri
 $htmlPath = [System.IO.Path]::ChangeExtension($outputFile, '.html')
 Set-Content -Path $htmlPath -Value $html -Encoding UTF8
 
-ConvertTo-Pdf -HtmlPath $htmlPath -PdfPath $outputFile
+ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $outputFile
 Remove-Item $htmlPath -ErrorAction SilentlyContinue
 
 Write-Host "Badges written to: $outputFile" -ForegroundColor Green
