@@ -118,15 +118,6 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 
 ### Check-in day (for helpers)
 
-**Setting up a second laptop:** clone/copy this repo onto it, copy
-`event.config.json`, `event.db`, and `lib\QRCoder.dll` over from the primary
-laptop, then run `.\scripts\Setup-CheckinLaptop.ps1` — it installs
-SumatraPDF/Edge/PSSQLite if missing, configures the secret vault with no
-master password, and sanity-checks the printer. Each laptop runs an
-**independent copy** of `event.db` (no live sync between desks yet — see
-open issues), so re-copy `event.db` from the primary laptop right before the
-event to pick up the latest registrations.
-
 Whoever's running the registration desk doesn't need to touch PowerShell
 directly — double-click **`Start-Checkin.bat`** in the repo root. It opens a
 menu-driven console app (`scripts/Checkin-Menu.ps1`):
@@ -148,8 +139,8 @@ menu-driven console app (`scripts/Checkin-Menu.ps1`):
 - **Option 2** is the same flow but only opens a preview of the label — no
   printing, no database changes — good for a dry run before doors open.
 - **Option 3** re-runs `Import-Attendees.ps1` (needs the Eventbrite
-  credential already set up — see Credential setup above). Runs immediately,
-  no confirmation prompt, and retries up to 3 times on a flaky connection.
+  credential already set up — see Credential setup above). Best demoed once
+  by a grown-up.
 - **Option 4** shows the same report as `List-UnsyncedWalkins.ps1` below.
 
 The menu is a thin wrapper around the same scripts and database described in
