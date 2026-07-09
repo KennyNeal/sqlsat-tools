@@ -9,8 +9,9 @@ the sponsor stamp game card — all driven by a single config file.
 ```
 1. Copy event.config.template.json → event.config.json
 2. Fill in your credentials and event IDs (see Config reference below)
-3. Run: .\scripts\Initialize-Database.ps1 -Config (Get-Content event.config.json | ConvertFrom-Json)
-4. Run: .\Update-Event.ps1
+3. Run: .\scripts\Test-EventReadiness.ps1   (preflight — checks config, secrets, data sources, tools)
+4. Run: .\scripts\Initialize-Database.ps1 -Config (Get-Content event.config.json | ConvertFrom-Json)
+5. Run: .\Update-Event.ps1
 ```
 
 That's it. Re-run `Update-Event.ps1` daily as new registrations come in.
@@ -86,6 +87,16 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 ---
 
 ## Scripts
+
+### Preflight
+
+```powershell
+# Validates everything the tools assume — config keys, secrets, website repo,
+# sponsor logos, Sessionize, Eventbrite, Edge/SumatraPDF/printer, database —
+# and reports PASS/WARN/FAIL per check. Run it the day before the event and
+# again the morning of, so problems surface all at once instead of mid-run.
+.\scripts\Test-EventReadiness.ps1
+```
 
 ### Daily workflow
 
@@ -191,6 +202,7 @@ sqlsat-tools/
 ├── event.config.json             ← gitignored; your live config
 ├── event.db                      ← gitignored; SQLite database
 ├── scripts/
+│   ├── Test-EventReadiness.ps1   ← preflight check; run before event runs
 │   ├── Initialize-Database.ps1
 │   ├── Import-Attendees.ps1
 │   ├── Generate-SpeedPasses.ps1
