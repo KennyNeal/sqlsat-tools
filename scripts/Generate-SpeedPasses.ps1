@@ -28,111 +28,39 @@ param(
 )
 
 Import-Module PSSQLite
-if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
-    Write-Host "Installing powershell-yaml module..." -ForegroundColor Cyan
-    Install-Module -Name powershell-yaml -Scope CurrentUser -Force
-}
-Import-Module powershell-yaml
 
 . "$PSScriptRoot\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
+. "$PSScriptRoot\Web-Helpers.ps1"
+. "$PSScriptRoot\Badge-Helpers.ps1"
 
 $dbPath      = Join-Path $PSScriptRoot ".." $Config.database.path
 $outputDir   = Join-Path $PSScriptRoot ".." $Config.speedpass.outputDir
-$libPath     = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"
-$edgePaths   = @(
-    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-    "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
-)
 
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
-# Load QRCoder
-if (-not (Test-Path $libPath)) { throw "QRCoder.dll not found at $libPath. Copy it from the old repo's lib\ folder." }
-Add-Type -Path $libPath
+Import-QRCoder
 
 # ── Sponsor logo fetch ────────────────────────────────────────────────────────
 
 function Get-SponsorLogos {
     param([PSCustomObject]$Config, [string[]]$Tiers)
 
-    $repo   = $Config.websiteRepo
-    $rawBase = "https://raw.githubusercontent.com/$($repo.owner)/$($repo.name)/$($repo.branch)"
-    $yamlUrl = "$rawBase/content/events/$($repo.eventKey)/sponsors.yaml"
-
-    Write-Host "  Fetching sponsor data from $yamlUrl" -ForegroundColor Cyan
-    $yaml = (Invoke-RestMethod -Uri $yamlUrl -Method Get)
-    $data = ConvertFrom-Yaml $yaml
-
-    $logos = [System.Collections.Generic.List[hashtable]]::new()
-    foreach ($group in $data.groups) {
+    $rawBase = Get-RawBase $Config
+    $logos   = [System.Collections.Generic.List[hashtable]]::new()
+    foreach ($group in (Get-SponsorGroups -Config $Config)) {
         if ($group.tier -notin $Tiers) { continue }
         foreach ($sponsor in $group.sponsors) {
-            $logoUrl = "$rawBase/static/$($sponsor.logo)"
             Write-Host "    Downloading: $($sponsor.name)" -ForegroundColor DarkGray
             try {
-                $raw      = (Invoke-WebRequest -Uri $logoUrl -UseBasicParsing).Content
-                $bytes    = if ($raw -is [string]) { [System.Text.Encoding]::UTF8.GetBytes($raw) } else { $raw }
-                $b64      = [Convert]::ToBase64String($bytes)
-                $ext      = [System.IO.Path]::GetExtension($sponsor.logo).TrimStart('.')
-                $mimeType = switch ($ext) {
-                    'svg'  { 'image/svg+xml' }
-                    'jpg'  { 'image/jpeg' }
-                    'jpeg' { 'image/jpeg' }
-                    default { "image/$ext" }
-                }
-                $logos.Add(@{ Name = $sponsor.name; Base64 = $b64; Mime = $mimeType; Fit = $sponsor.logoFit })
+                $img = Get-WebImage -Url "$rawBase/static/$($sponsor.logo)"
+                $logos.Add(@{ Name = $sponsor.name; Base64 = $img.Base64; Mime = $img.Mime; Fit = $sponsor.logoFit })
             } catch {
                 Write-Host "    Warning: could not download logo for $($sponsor.name): $_" -ForegroundColor Yellow
             }
         }
     }
     return $logos
-}
-
-# ── vCard builder ─────────────────────────────────────────────────────────────
-
-function New-VCard {
-    param($FirstName, $LastName, $Email, $Company, $JobTitle, $Website, $TwitterHandle)
-    $twitter = if ($TwitterHandle -and -not $TwitterHandle.StartsWith('@')) { "@$TwitterHandle" } else { $TwitterHandle }
-    $lines   = @(
-        "BEGIN:VCARD",
-        "VERSION:3.0",
-        "N:$LastName;$FirstName",
-        "FN:$FirstName $LastName"
-    )
-    if ($Company)     { $lines += "ORG:$Company" }
-    if ($JobTitle)    { $lines += "TITLE:$JobTitle" }
-    if ($Email)       { $lines += "EMAIL:$Email" }
-    if ($Website)     { $lines += "URL:$Website" }
-    if ($twitter)     { $lines += "X-SOCIALPROFILE;TYPE=twitter:$twitter" }
-    $lines += "END:VCARD"
-    return $lines -join "`r`n"
-}
-
-# ── QR code generator ─────────────────────────────────────────────────────────
-
-function New-QRBase64 {
-    param([string]$Data, [int]$PixelSize = 30)
-    $gen    = New-Object QRCoder.QRCodeGenerator
-    $qrData = $gen.CreateQrCode($Data, [QRCoder.QRCodeGenerator+ECCLevel]::L)
-    $qr     = New-Object QRCoder.QRCode($qrData)
-    $bmp    = $qr.GetGraphic($PixelSize)
-    $ms     = New-Object System.IO.MemoryStream
-    $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    $b64    = [Convert]::ToBase64String($ms.ToArray())
-    $ms.Dispose(); $bmp.Dispose(); $qr.Dispose(); $gen.Dispose()
-    return $b64
-}
-
-# ── Edge PDF renderer ─────────────────────────────────────────────────────────
-
-function ConvertTo-Pdf {
-    param([string]$HtmlPath, [string]$PdfPath)
-    $edge = $edgePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-    if (-not $edge) { throw "Microsoft Edge not found. Install Edge or update \$edgePaths." }
-    $null = & $edge --headless=new --print-to-pdf="$PdfPath" --no-margins "file:///$HtmlPath" --disable-gpu --disable-extensions --no-pdf-header-footer 2>&1
-    Start-Sleep -Seconds 4
 }
 
 # ── SpeedPass HTML builder ────────────────────────────────────────────────────
@@ -146,8 +74,8 @@ function New-SpeedPassHtml {
                               -Email $Attendee.Email -Company $Attendee.Company `
                               -JobTitle $Attendee.JobTitle -Website $Attendee.Website `
                               -TwitterHandle $Attendee.TwitterHandle
-    $vCardQR  = New-QRBase64 -Data $vcard
-    $orderQR  = New-QRBase64 -Data $Attendee.Barcode
+    $vCardQR  = New-QRBase64 -Data $vcard -PixelSize 30
+    $orderQR  = New-QRBase64 -Data $Attendee.Barcode -PixelSize 30
     $hashtag  = $EventConfig.event.hashtag
     $ename    = $EventConfig.event.name
 
@@ -273,7 +201,7 @@ foreach ($attendee in $attendees) {
 
     $html = New-SpeedPassHtml -Attendee $attendee -SponsorLogos $sponsorLogos -EventConfig $Config
     Set-Content -Path $htmlPath -Value $html -Encoding UTF8
-    ConvertTo-Pdf -HtmlPath $htmlPath -PdfPath $pdfPath
+    ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $pdfPath
     Remove-Item $htmlPath -ErrorAction SilentlyContinue
 
     Invoke-SqliteQuery -DataSource $dbPath -Query @"
