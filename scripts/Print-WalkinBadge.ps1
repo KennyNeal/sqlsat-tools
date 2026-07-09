@@ -30,10 +30,20 @@
     "Brother QL-820NWB".
 .PARAMETER Force
     Reprint without prompting for confirmation, even if already printed.
+.PARAMETER Preview
+    Generate the label as HTML or PDF and open it instead of printing. Does
+    not touch the PrintedBadges table. Useful for testing label layout
+    without a printer or a real attendee record.
+.PARAMETER PreviewFormat
+    Format to generate when -Preview is set: "Html" (default) or "Pdf".
 .EXAMPLE
     .\Print-WalkinBadge.ps1 -Config $config
 .EXAMPLE
     .\Print-WalkinBadge.ps1 -Config $config -Email "jane.doe@example.com"
+.EXAMPLE
+    .\Print-WalkinBadge.ps1 -Config $config -Email "jane.doe@example.com" -Preview
+.EXAMPLE
+    .\Print-WalkinBadge.ps1 -Config $config -Preview -PreviewFormat Pdf
 #>
 param(
     [Parameter(Mandatory)]
@@ -41,7 +51,10 @@ param(
     [string]$OrderId,
     [string]$Email,
     [string]$Printer,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Preview,
+    [ValidateSet('Html', 'Pdf')]
+    [string]$PreviewFormat = 'Html'
 )
 
 Import-Module PSSQLite
@@ -241,6 +254,24 @@ function Invoke-PrintOne {
 
     $matches = Find-Attendees -OrderId $OrderIdArg -Email $EmailArg
     $attendee = Select-Attendee -Matches $matches
+
+    if ($Preview) {
+        $htmlPath = Join-Path $outputDir "walkin-label-preview.html"
+        $html = New-LabelHtml -Attendee $attendee
+        Set-Content -Path $htmlPath -Value $html -Encoding UTF8
+
+        if ($PreviewFormat -eq 'Pdf') {
+            $pdfPath = Join-Path $outputDir "walkin-label-preview.pdf"
+            ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $pdfPath
+            Remove-Item $htmlPath -ErrorAction SilentlyContinue
+            Write-Host "  Preview PDF for $($attendee.FirstName) $($attendee.LastName): $pdfPath" -ForegroundColor Cyan
+            Invoke-Item $pdfPath
+        } else {
+            Write-Host "  Preview HTML for $($attendee.FirstName) $($attendee.LastName): $htmlPath" -ForegroundColor Cyan
+            Invoke-Item $htmlPath
+        }
+        return
+    }
 
     if ($attendee.PrintedAt -and -not $Force) {
         Write-Host "  Already printed for $($attendee.FirstName) $($attendee.LastName) at $($attendee.PrintedAt)." -ForegroundColor Yellow
