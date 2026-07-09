@@ -27,7 +27,7 @@ function Get-EventLogo {
     } else {
         try {
             $indexUrl = "$rawBase/content/events/$($Config.websiteRepo.eventKey)/_index.md"
-            $indexMd  = (Invoke-WebRequest -Uri $indexUrl -UseBasicParsing).Content
+            $indexMd  = Get-WebText -Url $indexUrl
             if ($indexMd -match '(?m)^logo:\s*(.+)$') { $Matches[1].Trim() } else { $null }
         } catch {
             Write-Host "  Could not read event logo from _index.md: $_" -ForegroundColor Yellow

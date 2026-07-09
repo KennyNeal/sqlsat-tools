@@ -173,6 +173,11 @@ Sponsor names, tiers, and logos are read live from the
 Update `data/sponsors/{sponsorDataFile}.yaml` in that repo and the next pipeline run
 picks up the changes automatically — no manual sync needed.
 
+Every successful fetch is also cached in `cache/` (gitignored). If a fetch fails —
+say, no internet at the venue — the cached copy is used automatically, so anything
+that ran once with connectivity keeps working offline. Delete `cache/` to force
+fresh downloads.
+
 ---
 
 ## Database

@@ -1,6 +1,7 @@
 event.config.json
 event.db
 output/
+cache/
 *.xml
 *.log
 __pycache__/

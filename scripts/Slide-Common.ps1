@@ -66,7 +66,8 @@ function Get-SponsorLogoFiles {
             $ext = [System.IO.Path]::GetExtension($sponsor.logo)
             $rawLogoPath = Join-Path $WorkDir "sponsor$i$ext"
             try {
-                Invoke-WebRequest -Uri "$rawBase/static/$($sponsor.logo)" -OutFile $rawLogoPath -UseBasicParsing
+                $bytes = Get-WebBytes -Url "$rawBase/static/$($sponsor.logo)"
+                [System.IO.File]::WriteAllBytes($rawLogoPath, $bytes)
             } catch {
                 Write-Host "  Warning: could not download logo for $($sponsor.name)" -ForegroundColor Yellow
                 continue
