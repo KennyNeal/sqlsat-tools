@@ -118,6 +118,15 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 
 ### Check-in day (for helpers)
 
+**Setting up a second laptop:** clone/copy this repo onto it, copy
+`event.config.json`, `event.db`, and `lib\QRCoder.dll` over from the primary
+laptop, then run `.\scripts\Setup-CheckinLaptop.ps1` — it installs
+SumatraPDF/Edge/PSSQLite if missing, configures the secret vault with no
+master password, and sanity-checks the printer. Each laptop runs an
+**independent copy** of `event.db` (no live sync between desks yet — see
+open issues), so re-copy `event.db` from the primary laptop right before the
+event to pick up the latest registrations.
+
 Whoever's running the registration desk doesn't need to touch PowerShell
 directly — double-click **`Start-Checkin.bat`** in the repo root. It opens a
 menu-driven console app (`scripts/Checkin-Menu.ps1`):
