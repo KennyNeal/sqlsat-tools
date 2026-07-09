@@ -75,7 +75,7 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `slideTemplate.primaryColor` / `slideTemplate.secondaryColor` | Hex brand colors for the header/footer bars and slide text (shared with the raffle deck) |
 | `slideTemplate.outputFile` | Where the generated `.potx` is written |
 | `raffleDeck.individualTiers` | Sponsor tiers that get one slide per sponsor in the loop deck (e.g. `["global","platinum"]`) |
-| `raffleDeck.gridGroups` | Remaining tiers grouped onto shared grid slide(s), in order (e.g. `[["gold"],["silver","bronze"]]`) |
+| `raffleDeck.gridGroups` | Remaining tiers grouped onto shared grid slide(s), in order (e.g. `[["gold"],["silver","bronze"],["book"]]`) |
 | `raffleDeck.maxPerGridSlide` | Sponsors per grid slide before splitting onto another slide |
 | `raffleDeck.loopAdvanceSeconds` | Seconds each loop-deck slide stays up before auto-advancing |
 | `raffleDeck.excludeSponsors` | Sponsor names to skip in the raffle hero section (they still get a loop-deck recognition slide) — for sponsors not doing a drawing this year |
