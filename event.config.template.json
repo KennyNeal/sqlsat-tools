@@ -45,7 +45,7 @@
     "loopAdvanceSeconds": 8,
     "maxPerGridSlide": 8,
     "individualTiers": ["global", "platinum"],
-    "gridGroups": [["gold"], ["silver", "bronze"]],
+    "gridGroups": [["gold"], ["silver", "bronze"], ["book"]],
     "excludeSponsors": [],
     "outputFile": "./output/RaffleDeck.pptx"
   },
