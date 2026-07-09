@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse all PowerShell scripts
+        shell: pwsh
+        run: |
+          $errCount = 0
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+              $file = $_
+              $tokens = $null; $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+              foreach ($e in $errors) {
+                  Write-Host "::error file=$($file.FullName),line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              }
+              if ($errors.Count -eq 0) { Write-Host "OK: $($file.Name)" }
+              $errCount += $errors.Count
+          }
+          if ($errCount -gt 0) { exit 1 }
+
+      - name: PSScriptAnalyzer (errors only)
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
+          if ($results) {
+              $results | Format-Table RuleName, ScriptName, Line, Message -AutoSize | Out-String -Width 200 | Write-Host
+              exit 1
+          }
+          Write-Host "No PSScriptAnalyzer errors."
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build slide decks from synthetic manifests
+        run: |
+          pip install --quiet python-pptx Pillow
+          python .github/ci/build_test_decks.py
