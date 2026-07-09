@@ -8,6 +8,10 @@
     pre-printed blank badge template. Tracks what's already been printed in the
     PrintedBadges table so staff can see reprint status at the desk.
 
+    Lunch type is printed when the attendee's registration came from an
+    Eventbrite order (LunchType is set). Walk-ins registered on the spot at
+    the desk don't collect lunch type, so nothing is shown for them.
+
     If no -OrderId/-Email is given, runs as an interactive loop: prompts for a
     lookup value, prints, and asks for the next one, so one launch can serve
     the whole registration desk. Pass -OrderId/-Email for a single one-off run.
@@ -70,6 +74,8 @@ function New-LabelHtml {
 
     $titleHtml   = if ($Attendee.JobTitle) { "<div class=`"job-title`">$([System.Web.HttpUtility]::HtmlEncode($Attendee.JobTitle))</div>" } else { "" }
     $companyHtml = if ($Attendee.Company)  { "<div class=`"company`">$([System.Web.HttpUtility]::HtmlEncode($Attendee.Company))</div>" }  else { "" }
+    # Only Eventbrite orders carry a LunchType; walk-ins registered on the spot don't collect one.
+    $lunchHtml   = if ($Attendee.OrderId -ne 'WALKIN' -and $Attendee.LunchType) { "<div class=`"lunch-type`">$([System.Web.HttpUtility]::HtmlEncode($Attendee.LunchType))</div>" } else { "" }
 
     return @"
 <!DOCTYPE html>
@@ -112,6 +118,12 @@ body { width: 3.9in; height: 2.4in; }
 }
 .job-title { font-size: 10pt; color: #333; margin-top: 0.08in; line-height: 1.2; }
 .company   { font-size: 10pt; color: #555; line-height: 1.2; }
+.lunch-type {
+    font-size: 10pt;
+    color: #cc2200;
+    margin-top: 0.08in;
+    font-weight: 500;
+}
 .qr {
     position: absolute;
     top: 0.15in; right: 0.15in;
@@ -126,6 +138,7 @@ body { width: 3.9in; height: 2.4in; }
     <div class="last-name">$([System.Web.HttpUtility]::HtmlEncode($Attendee.LastName))</div>
     $titleHtml
     $companyHtml
+    $lunchHtml
   </div>
   <img class="qr" src="data:image/png;base64,$qrB64"/>
 </div>
@@ -151,7 +164,7 @@ function Find-Attendees {
     param([string]$OrderId, [string]$Email)
 
     $query = @"
-SELECT a.Barcode, a.OrderId, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, p.PrintedAt
+SELECT a.Barcode, a.OrderId, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType, p.PrintedAt
 FROM   Attendees a
 LEFT JOIN PrintedBadges p ON p.Barcode = a.Barcode
 WHERE  ($(if ($OrderId) { "a.OrderId = @OrderId" } else { "a.Email = @Email" }))
@@ -193,11 +206,13 @@ VALUES
 
     return [PSCustomObject]@{
         Barcode   = $barcode
+        OrderId   = 'WALKIN'
         FirstName = $firstName
         LastName  = $lastName
         Email     = $walkinEmail
         Company   = $company
         JobTitle  = $jobTitle
+        LunchType = $null
         PrintedAt = $null
     }
 }
