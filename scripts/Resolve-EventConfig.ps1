@@ -26,9 +26,9 @@ function Resolve-EventConfig {
 
     Write-Host "Fetching event metadata ($($Config.websiteRepo.eventKey))..." -ForegroundColor Cyan
     try {
-        $indexMd = (Invoke-WebRequest -Uri $indexUrl -UseBasicParsing).Content
+        $indexMd = Get-WebText -Url $indexUrl
     } catch {
-        throw "Could not fetch event metadata from $indexUrl : $_"
+        throw "Could not fetch event metadata from $indexUrl (and no cached copy in cache\): $_"
     }
 
     if ($indexMd -match '(?m)^title:\s*(.+)$') {
