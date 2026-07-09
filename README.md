@@ -104,6 +104,37 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 .\Update-Event.ps1 -EmailOnly
 ```
 
+### Check-in day (for helpers)
+
+Whoever's running the registration desk doesn't need to touch PowerShell
+directly — double-click **`Start-Checkin.bat`** in the repo root. It opens a
+menu-driven console app (`scripts/Checkin-Menu.ps1`):
+
+```
+============================
+   SQL Saturday Check-In
+============================
+[1] Check in an attendee
+[2] Practice mode (no printing)
+[3] Sync new registrations from Eventbrite
+[4] Show walk-ins not yet in Eventbrite
+[Q] Quit
+```
+
+- **Option 1** is the desk loop: type/scan an order # or email, it prints the
+  badge label and asks for the next one. Unknown lookups prompt a quick-add
+  walk-in form. Leave the lookup blank to return to the menu.
+- **Option 2** is the same flow but only opens a preview of the label — no
+  printing, no database changes — good for a dry run before doors open.
+- **Option 3** re-runs `Import-Attendees.ps1` (needs the Eventbrite
+  credential already set up — see Credential setup above). Best demoed once
+  by a grown-up.
+- **Option 4** shows the same report as `List-UnsyncedWalkins.ps1` below.
+
+The menu is a thin wrapper around the same scripts and database described in
+this section — `scripts/Checkin-Core.ps1` holds the shared lookup/print
+logic so both the menu and the raw CLI script below stay in sync.
+
 ### Event-day tools
 
 ```powershell
@@ -185,6 +216,7 @@ DELETE FROM ProcessedAttendees WHERE Barcode = 'xxx';
 ```
 sqlsat-tools/
 ├── Update-Event.ps1              ← run this
+├── Start-Checkin.bat              ← double-click for check-in day
 ├── event.config.template.json    ← copy → event.config.json
 ├── event.config.json             ← gitignored; your live config
 ├── event.db                      ← gitignored; SQLite database
@@ -201,6 +233,8 @@ sqlsat-tools/
 │   ├── generate_raffle_deck.py
 │   ├── slide_helpers.py          ← shared by both slide-deck builders
 │   ├── Generate-NameTag.ps1      ← bulk Avery badge sheets
+│   ├── Checkin-Menu.ps1          ← check-in day TUI, launched by Start-Checkin.bat
+│   ├── Checkin-Core.ps1          ← shared lookup/print logic (Checkin-Menu.ps1 + Print-WalkinBadge.ps1)
 │   ├── Print-WalkinBadge.ps1     ← day-of/walk-in single-label printing (Brother QL-820NWB)
 │   ├── List-UnsyncedWalkins.ps1  ← walk-ins not yet registered in Eventbrite
 │   └── Badge-Helpers.ps1         ← shared by both badge scripts (vCard/QR/PDF/print)
