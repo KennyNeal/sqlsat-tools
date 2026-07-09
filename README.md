@@ -156,6 +156,46 @@ The menu is a thin wrapper around the same scripts and database described in
 this section — `scripts/Checkin-Core.ps1` holds the shared lookup/print
 logic so both the menu and the raw CLI script below stay in sync.
 
+### Check-in day (for helpers)
+
+**Setting up a second laptop:** clone/copy this repo onto it, copy
+`event.config.json`, `event.db`, and `lib\QRCoder.dll` over from the primary
+laptop, then run `.\scripts\Setup-CheckinLaptop.ps1` — it installs
+SumatraPDF/Edge/PSSQLite if missing, configures the secret vault with no
+master password, and sanity-checks the printer. Each laptop runs an
+**independent copy** of `event.db` (no live sync between desks yet — see
+open issues), so re-copy `event.db` from the primary laptop right before the
+event to pick up the latest registrations.
+
+Whoever's running the registration desk doesn't need to touch PowerShell
+directly — double-click **`Start-Checkin.bat`** in the repo root. It opens a
+menu-driven console app (`scripts/Checkin-Menu.ps1`):
+
+```
+============================
+   SQL Saturday Check-In
+============================
+[1] Check in an attendee
+[2] Practice mode (no printing)
+[3] Sync new registrations from Eventbrite
+[4] Show walk-ins not yet in Eventbrite
+[Q] Quit
+```
+
+- **Option 1** is the desk loop: type/scan an order # or email, it prints the
+  badge label and asks for the next one. Unknown lookups prompt a quick-add
+  walk-in form. Leave the lookup blank to return to the menu.
+- **Option 2** is the same flow but only opens a preview of the label — no
+  printing, no database changes — good for a dry run before doors open.
+- **Option 3** re-runs `Import-Attendees.ps1` (needs the Eventbrite
+  credential already set up — see Credential setup above). Runs immediately,
+  no confirmation prompt, and retries up to 3 times on a flaky connection.
+- **Option 4** shows the same report as `List-UnsyncedWalkins.ps1` below.
+
+The menu is a thin wrapper around the same scripts and database described in
+this section — `scripts/Checkin-Core.ps1` holds the shared lookup/print
+logic so both the menu and the raw CLI script below stay in sync.
+
 ### Event-day tools
 
 ```powershell
