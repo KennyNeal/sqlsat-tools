@@ -1,12 +1,30 @@
 <#
 .SYNOPSIS
-    Shared helpers for badge/label generation, used by Generate-NameTag.ps1 and
-    Print-WalkinBadge.ps1: vCard/QR generation, HTML-to-PDF rendering via headless
-    Edge, and silent printing via SumatraPDF.
+    Shared helpers for badge/label/QR generation, used by every script that
+    produces printable output: Edge discovery, QRCoder loading, vCard/QR
+    generation, HTML-to-PDF rendering via headless Edge, and silent printing
+    via SumatraPDF.
 #>
 
+function Get-EdgePath {
+    $edgePaths = @(
+        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+        "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
+    )
+    $edge = $edgePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $edge) { throw "Microsoft Edge not found." }
+    return $edge
+}
+
+function Import-QRCoder {
+    $libPath = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"
+    if (-not (Test-Path $libPath)) { throw "QRCoder.dll not found at $libPath." }
+    Add-Type -Path $libPath
+}
+
 function New-VCard {
-    param($FirstName, $LastName, $Email, $Company, $JobTitle)
+    param($FirstName, $LastName, $Email, $Company, $JobTitle, $Website, $TwitterHandle)
+    $twitter = if ($TwitterHandle -and -not $TwitterHandle.StartsWith('@')) { "@$TwitterHandle" } else { $TwitterHandle }
     $lines = @(
         "BEGIN:VCARD",
         "VERSION:3.0",
@@ -16,14 +34,16 @@ function New-VCard {
     if ($Company)  { $lines += "ORG:$Company" }
     if ($JobTitle) { $lines += "TITLE:$JobTitle" }
     if ($Email)    { $lines += "EMAIL:$Email" }
+    if ($Website)  { $lines += "URL:$Website" }
+    if ($twitter)  { $lines += "X-SOCIALPROFILE;TYPE=twitter:$twitter" }
     $lines += "END:VCARD"
     return $lines -join "`r`n"
 }
 
 function New-QRBase64 {
-    param([string]$Data, [int]$PixelSize = 20)
+    param([string]$Data, [int]$PixelSize = 20, [string]$EccLevel = 'L')
     $gen    = New-Object QRCoder.QRCodeGenerator
-    $qrData = $gen.CreateQrCode($Data, [QRCoder.QRCodeGenerator+ECCLevel]::L)
+    $qrData = $gen.CreateQrCode($Data, [QRCoder.QRCodeGenerator+ECCLevel]::$EccLevel)
     $qr     = New-Object QRCoder.QRCode($qrData)
     $bmp    = $qr.GetGraphic($PixelSize)
     $ms     = New-Object System.IO.MemoryStream
@@ -39,12 +59,7 @@ function ConvertTo-PdfViaEdge {
         [Parameter(Mandatory)][string]$PdfPath,
         [int]$TimeoutSeconds = 20
     )
-    $edgePaths = @(
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-        "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
-    )
-    $edge = $edgePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-    if (-not $edge) { throw "Microsoft Edge not found." }
+    $edge = Get-EdgePath
 
     if (Test-Path $PdfPath) { Remove-Item $PdfPath -Force }
     $null = & $edge --headless=new --print-to-pdf="$PdfPath" --no-margins "file:///$HtmlPath" --disable-gpu --disable-extensions --no-pdf-header-footer 2>&1

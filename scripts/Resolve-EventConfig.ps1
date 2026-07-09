@@ -3,50 +3,36 @@
     Enriches a config object with live event metadata from the website repo.
 .DESCRIPTION
     Fetches content/events/{eventKey}/_index.md from the website repo and merges
-    the following fields into the config object at runtime:
-      event.name         ← title
-      sessionize.eventId ← sessionizeId (fallback only — local config wins,
-                           since the website ID is a JS embed endpoint and
-                           the tools need a JSON endpoint)
+    event.name (from title:) into the config object at runtime, so the event
+    name has a single source of truth on the website.
 
-    Call this once at the top of any script that needs these fields.
+    Call this once at the top of any script that needs event.name.
     The config key websiteRepo.eventKey is the only required bootstrap value.
+
+    Note: sessionize.eventId always comes from local config. The website's
+    sessionizeId is a JavaScript embed endpoint, which the tools can't use —
+    they need the JSON endpoint ID (see the Sessionize error in
+    Generate-Schedule.ps1).
 .PARAMETER Config
     Parsed event.config.json object.
 #>
+
+. "$PSScriptRoot\Web-Helpers.ps1"
+
 function Resolve-EventConfig {
     param([Parameter(Mandatory)][PSCustomObject]$Config)
 
-    $repo    = $Config.websiteRepo
-    $rawBase = "https://raw.githubusercontent.com/$($repo.owner)/$($repo.name)/$($repo.branch)"
-    $indexUrl = "$rawBase/content/events/$($repo.eventKey)/_index.md"
+    $indexUrl = "$(Get-RawBase $Config)/content/events/$($Config.websiteRepo.eventKey)/_index.md"
 
-    Write-Host "Fetching event metadata ($($repo.eventKey))..." -ForegroundColor Cyan
+    Write-Host "Fetching event metadata ($($Config.websiteRepo.eventKey))..." -ForegroundColor Cyan
     try {
         $indexMd = (Invoke-WebRequest -Uri $indexUrl -UseBasicParsing).Content
     } catch {
         throw "Could not fetch event metadata from $indexUrl : $_"
     }
 
-    function Get-Field([string]$key) {
-        if ($indexMd -match "(?m)^${key}:\s*(.+)$") { return $Matches[1].Trim() }
-        return $null
-    }
-
-    $title        = Get-Field 'title'
-    $sessionizeId = Get-Field 'sessionizeId'
-
-    if ($title) { $Config.event | Add-Member -NotePropertyName 'name' -NotePropertyValue $title -Force }
-
-    # The website's sessionizeId is a JavaScript embed endpoint; the tools need a
-    # JSON endpoint. Only fall back to the website's ID when the local config
-    # doesn't provide sessionize.eventId (the JSON endpoint) itself.
-    if ($sessionizeId) {
-        if (-not $Config.PSObject.Properties['sessionize']) {
-            $Config | Add-Member -NotePropertyName 'sessionize' -NotePropertyValue ([PSCustomObject]@{ eventId = $sessionizeId })
-        } elseif (-not $Config.sessionize.eventId) {
-            $Config.sessionize | Add-Member -NotePropertyName 'eventId' -NotePropertyValue $sessionizeId -Force
-        }
+    if ($indexMd -match '(?m)^title:\s*(.+)$') {
+        $Config.event | Add-Member -NotePropertyName 'name' -NotePropertyValue $Matches[1].Trim() -Force
     }
 
     return $Config

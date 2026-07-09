@@ -26,6 +26,7 @@ param(
 
 . "$PSScriptRoot\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
+. "$PSScriptRoot\Badge-Helpers.ps1"
 
 $sessionizeId = $Config.sessionize.eventId
 $outputFile   = Join-Path $PSScriptRoot ".." $Config.schedule.outputFile
@@ -229,10 +230,13 @@ $front = $rooms[0..($half - 1)]
 $back  = if ($rooms.Count -gt $half) { $rooms[$half..($rooms.Count - 1)] } else { @() }
 
 $qrHtml = if ($appUrl) {
-    $qrData = [uri]::EscapeDataString($appUrl)
+    # Generated locally with the bundled QRCoder.dll so the printed schedule
+    # doesn't depend on an external QR web service being up at render time.
+    Import-QRCoder
+    $qrB64 = New-QRBase64 -Data $appUrl -PixelSize 10
     @"
 <div class="header-qr">
-  <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&format=svg&data=$qrData" alt="App QR Code" class="qr-code">
+  <img src="data:image/png;base64,$qrB64" alt="App QR Code" class="qr-code">
   <div class="qr-text">Use the App</div>
 </div>
 "@

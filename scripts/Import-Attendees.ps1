@@ -53,31 +53,44 @@ VALUES
      @LunchType, @TicketType, @AttendeeStatus, @IsVolunteer, @TwitterHandle, @Website, datetime('now'))
 "@
 
+# One connection and one transaction for the whole loop — a connection (and
+# implicit transaction) per row makes a few-hundred-row import take minutes.
+$conn = New-SQLiteConnection -DataSource $dbPath
 $imported = 0
-foreach ($a in $all) {
-    $profile = $a.profile
-    $barcode = ($a.barcodes | Select-Object -First 1).barcode
-    if (-not $barcode) { continue }
+try {
+    Invoke-SqliteQuery -SQLiteConnection $conn -Query "BEGIN"
+    foreach ($a in $all) {
+        $profile = $a.profile
+        $barcode = ($a.barcodes | Select-Object -First 1).barcode
+        if (-not $barcode) { continue }
 
-    $answers = $a.answers
+        $answers = $a.answers
 
-    Invoke-SqliteQuery -DataSource $dbPath -Query $upsertSql -SqlParameters @{
-        Barcode        = $barcode
-        OrderId        = $a.order_id
-        OrderDate      = $a.created
-        FirstName      = $profile.first_name
-        LastName       = $profile.last_name
-        Email          = $profile.email
-        Company        = $profile.company
-        JobTitle       = $profile.job_title
-        LunchType      = Get-Answer $answers "Lunch"
-        TicketType     = $a.ticket_class_name
-        AttendeeStatus = $a.status
-        IsVolunteer    = if ((Get-Answer $answers "volunteer") -eq "Yes") { 1 } else { 0 }
-        TwitterHandle  = Get-Answer $answers "Twitter"
-        Website        = $profile.website
+        Invoke-SqliteQuery -SQLiteConnection $conn -Query $upsertSql -SqlParameters @{
+            Barcode        = $barcode
+            OrderId        = $a.order_id
+            OrderDate      = $a.created
+            FirstName      = $profile.first_name
+            LastName       = $profile.last_name
+            Email          = $profile.email
+            Company        = $profile.company
+            JobTitle       = $profile.job_title
+            LunchType      = Get-Answer $answers "Lunch"
+            TicketType     = $a.ticket_class_name
+            AttendeeStatus = $a.status
+            IsVolunteer    = if ((Get-Answer $answers "volunteer") -eq "Yes") { 1 } else { 0 }
+            TwitterHandle  = Get-Answer $answers "Twitter"
+            Website        = $profile.website
+        }
+        $imported++
     }
-    $imported++
+    Invoke-SqliteQuery -SQLiteConnection $conn -Query "COMMIT"
+} catch {
+    try { Invoke-SqliteQuery -SQLiteConnection $conn -Query "ROLLBACK" } catch { }
+    throw
+} finally {
+    $conn.Close()
+    $conn.Dispose()
 }
 
 Write-Host "Import complete. Upserted $imported attendees." -ForegroundColor Green

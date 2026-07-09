@@ -61,7 +61,8 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `websiteRepo.owner` | GitHub org or user that owns the website repo |
 | `websiteRepo.name` | GitHub repo name |
 | `websiteRepo.branch` | Branch to read from (usually `main`) |
-| `websiteRepo.eventKey` | Folder under `content/events/` in the website repo (e.g. `dodbr-2026`). Event name, Sessionize ID, sponsor data file, and event logo are all read from that folder's `_index.md` at runtime. |
+| `websiteRepo.eventKey` | Folder under `content/events/` in the website repo (e.g. `dodbr-2026`). Event name, sponsor data file, and event logo are all read from that folder's `_index.md` at runtime. |
+| `sessionize.eventId` | Sessionize **JSON** API endpoint ID (Sessionize → Embed & API → create an endpoint with format "JSON"). Note this is not the JS-embed ID the website uses. |
 | `eventbrite.eventId` | Numeric EventBrite event ID (find it in the organizer dashboard URL) |
 | `eventbrite.secretName` | SecretManagement secret name for the API token |
 | `email.secretName` | SecretManagement secret name for Gmail credentials |
@@ -185,6 +186,7 @@ DELETE FROM ProcessedAttendees WHERE Barcode = 'xxx';
 ```
 sqlsat-tools/
 ├── Update-Event.ps1              ← run this
+├── planning-calendar.html        ← standalone event-planning calendar/checklist; just open in a browser
 ├── event.config.template.json    ← copy → event.config.json
 ├── event.config.json             ← gitignored; your live config
 ├── event.db                      ← gitignored; SQLite database
@@ -199,11 +201,15 @@ sqlsat-tools/
 │   ├── generate_slide_template.py
 │   ├── Generate-RaffleDeck.ps1
 │   ├── generate_raffle_deck.py
-│   ├── slide_helpers.py          ← shared by both slide-deck builders
+│   ├── slide_helpers.py          ← shared by both slide-deck builders (Python side)
+│   ├── Slide-Common.ps1          ← shared by both slide-deck builders (PowerShell side)
 │   ├── Generate-NameTag.ps1      ← bulk Avery badge sheets
 │   ├── Print-WalkinBadge.ps1     ← day-of/walk-in single-label printing (Brother QL-820NWB)
 │   ├── List-UnsyncedWalkins.ps1  ← walk-ins not yet registered in Eventbrite
-│   └── Badge-Helpers.ps1         ← shared by both badge scripts (vCard/QR/PDF/print)
+│   ├── Badge-Helpers.ps1         ← shared vCard/QR/Edge-PDF/print helpers
+│   ├── Web-Helpers.ps1           ← shared website-repo fetch helpers (images, sponsors.yaml)
+│   ├── Resolve-EventConfig.ps1   ← merges event name from the website repo into config
+│   └── Get-EventLogo.ps1         ← fetches the event logo from the website repo
 ├── templates/
 │   └── attendee-email.html
 ├── assets/

@@ -60,7 +60,6 @@ param(
 Import-Module PSSQLite
 
 $dbPath      = Join-Path $PSScriptRoot ".." $Config.database.path
-$libPath     = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"
 $outputDir   = Join-Path $PSScriptRoot "..\output"
 $printerName = if ($Printer) {
     $Printer
@@ -71,10 +70,9 @@ $printerName = if ($Printer) {
 }
 
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
-if (-not (Test-Path $libPath)) { throw "QRCoder.dll not found at $libPath." }
-Add-Type -Path $libPath
 
 . (Join-Path $PSScriptRoot "Badge-Helpers.ps1")
+Import-QRCoder
 
 # ── Label HTML builder (2.4in x 3.9in landscape, no background art) ──────────
 

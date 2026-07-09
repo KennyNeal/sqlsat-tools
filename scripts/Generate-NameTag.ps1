@@ -35,7 +35,6 @@ $outputFile = if ($Config.PSObject.Properties['badge'] -and $Config.badge.output
     Join-Path $PSScriptRoot "..\output\badges.pdf"
 }
 $outputDir = Split-Path $outputFile -Parent
-$libPath   = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"
 
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
@@ -63,12 +62,8 @@ $bgMime  = switch ($bgExt) {
 }
 Write-Host "  Loaded badge background: $bgImagePath" -ForegroundColor DarkGray
 
-# ── QRCoder ───────────────────────────────────────────────────────────────────
-
-if (-not (Test-Path $libPath)) { throw "QRCoder.dll not found at $libPath." }
-Add-Type -Path $libPath
-
 . (Join-Path $PSScriptRoot "Badge-Helpers.ps1")
+Import-QRCoder
 
 # ── Badge HTML builder ────────────────────────────────────────────────────────
 

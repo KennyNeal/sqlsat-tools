@@ -18,55 +18,31 @@ param(
     [int]$GridColumns = 0
 )
 
-if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
-    Install-Module -Name powershell-yaml -Scope CurrentUser -Force
-}
-Import-Module powershell-yaml
-
 . "$PSScriptRoot\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
+. "$PSScriptRoot\Web-Helpers.ps1"
+. "$PSScriptRoot\Badge-Helpers.ps1"
 
 $cols       = if ($GridColumns -gt 0) { $GridColumns } else { $Config.stampGame.gridColumns }
 $outputFile = Join-Path $PSScriptRoot ".." $Config.stampGame.outputFile
 $outputDir  = Split-Path $outputFile
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
-$edgePaths = @(
-    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-    "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
-)
-
 # ── Fetch sponsor logos ───────────────────────────────────────────────────────
 
-$repo    = $Config.websiteRepo
-$rawBase = "https://raw.githubusercontent.com/$($repo.owner)/$($repo.name)/$($repo.branch)"
-$yamlUrl = "$rawBase/content/events/$($repo.eventKey)/sponsors.yaml"
-
-Write-Host "Fetching sponsor data..." -ForegroundColor Cyan
-$yaml = (Invoke-RestMethod -Uri $yamlUrl -Method Get)
-$data = ConvertFrom-Yaml $yaml
+$rawBase = Get-RawBase $Config
 
 $logos = [System.Collections.Generic.List[hashtable]]::new()
-foreach ($group in $data.groups) {
+foreach ($group in (Get-SponsorGroups -Config $Config)) {
     if ($group.tier -notin $Config.stampGame.tiers) { continue }
     foreach ($sponsor in $group.sponsors) {
         if ($sponsor.name -in $Config.stampGame.excludeSponsors) {
             Write-Host "  Skipping (excluded): $($sponsor.name)" -ForegroundColor DarkGray
             continue
         }
-        $logoUrl = "$rawBase/static/$($sponsor.logo)"
         try {
-            $raw      = (Invoke-WebRequest -Uri $logoUrl -UseBasicParsing).Content
-            $bytes    = if ($raw -is [string]) { [System.Text.Encoding]::UTF8.GetBytes($raw) } else { $raw }
-            $b64      = [Convert]::ToBase64String($bytes)
-            $ext      = [System.IO.Path]::GetExtension($sponsor.logo).TrimStart('.')
-            $mimeType = switch ($ext) {
-                'svg'  { 'image/svg+xml' }
-                'jpg'  { 'image/jpeg' }
-                'jpeg' { 'image/jpeg' }
-                default { "image/$ext" }
-            }
-            $logos.Add(@{ Name = $sponsor.name; Base64 = $b64; Mime = $mimeType })
+            $img = Get-WebImage -Url "$rawBase/static/$($sponsor.logo)"
+            $logos.Add(@{ Name = $sponsor.name; Base64 = $img.Base64; Mime = $img.Mime })
             Write-Host "  $($sponsor.name)" -ForegroundColor DarkGray
         } catch {
             Write-Host "  Warning: could not load logo for $($sponsor.name)" -ForegroundColor Yellow
@@ -199,11 +175,7 @@ $cardHtml
 $htmlPath = [System.IO.Path]::ChangeExtension($outputFile, ".html")
 Set-Content -Path $htmlPath -Value $html -Encoding UTF8
 
-$edge = $edgePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $edge) { throw "Microsoft Edge not found." }
-
-$null = & $edge --headless=new --print-to-pdf="$outputFile" --no-margins "file:///$htmlPath" --disable-gpu --disable-extensions --no-pdf-header-footer 2>&1
-Start-Sleep -Seconds 4
+ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $outputFile
 Remove-Item $htmlPath -ErrorAction SilentlyContinue
 
 Write-Host "Stamp game PDF: $outputFile" -ForegroundColor Green
