@@ -183,25 +183,16 @@ function Invoke-CheckinLoop {
 
 function Invoke-EventbriteSync {
     Write-Banner
-    Write-Host "  Pulling the latest registrations from Eventbrite. Needs the internet," -ForegroundColor White
-    Write-Host "  can take a little while..." -ForegroundColor White
-    Write-Host ""
+    Write-Host "  This pulls the latest registrations from Eventbrite. It can take a" -ForegroundColor White
+    Write-Host "  little while and needs the internet." -ForegroundColor White
+    $confirm = Read-Host "  Continue? (y/N)"
+    if ($confirm -notmatch '^[Yy]') { return }
 
-    $maxAttempts = 3
-    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-        try {
-            & (Join-Path $scriptsDir "Import-Attendees.ps1") -Config $config
-            break
-        } catch {
-            if ($attempt -lt $maxAttempts) {
-                Write-Host "  Connection hiccup: $($_.Exception.Message)" -ForegroundColor Yellow
-                Write-Host "  Trying again ($($attempt + 1) of $maxAttempts)..." -ForegroundColor Yellow
-                Start-Sleep -Seconds 3
-            } else {
-                Write-Host "  Sync failed after $maxAttempts tries: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host "  Check the wifi and try again from the menu." -ForegroundColor Yellow
-            }
-        }
+    Write-Host ""
+    try {
+        & (Join-Path $scriptsDir "Import-Attendees.ps1") -Config $config
+    } catch {
+        Write-Host "  Sync failed: $($_.Exception.Message)" -ForegroundColor Red
     }
     Wait-ForEnter
 }
