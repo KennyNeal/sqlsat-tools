@@ -139,8 +139,8 @@ menu-driven console app (`scripts/Checkin-Menu.ps1`):
 - **Option 2** is the same flow but only opens a preview of the label — no
   printing, no database changes — good for a dry run before doors open.
 - **Option 3** re-runs `Import-Attendees.ps1` (needs the Eventbrite
-  credential already set up — see Credential setup above). Best demoed once
-  by a grown-up.
+  credential already set up — see Credential setup above). Runs immediately,
+  no confirmation prompt, and retries up to 3 times on a flaky connection.
 - **Option 4** shows the same report as `List-UnsyncedWalkins.ps1` below.
 
 The menu is a thin wrapper around the same scripts and database described in
