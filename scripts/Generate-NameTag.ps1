@@ -243,22 +243,24 @@ window.addEventListener('DOMContentLoaded', function() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 # Query attendees
-$emailFilter = if ($Email) { "Email = @Email" } else { $null }
-$conditions  = @($emailFilter) | Where-Object { $_ }
+$emailFilter = if ($Email) { "a.Email = @Email" } else { $null }
+$nullFilter  = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
+$conditions  = @($emailFilter, $nullFilter) | Where-Object { $_ }
 $whereClause = if ($conditions) { "WHERE " + ($conditions -join " AND ") } else { "" }
 
 $query = @"
-SELECT FirstName, LastName, Email, Company, JobTitle, LunchType
-FROM   Attendees
+SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType
+FROM   Attendees a
+LEFT   JOIN PrintedBadges p ON a.Barcode = p.Barcode
 $whereClause
-ORDER  BY LastName, FirstName
+ORDER  BY a.LastName, a.FirstName
 "@
 
 $sqlParams = if ($Email) { @{ Email = $Email } } else { @{} }
 $attendees = Invoke-SqliteQuery -DataSource $dbPath -Query $query -SqlParameters $sqlParams
 
 if ($attendees.Count -eq 0) {
-    Write-Host "No attendees found." -ForegroundColor Yellow
+    Write-Host "No attendees need badge generation. Use -Force to regenerate all." -ForegroundColor Yellow
     return
 }
 
@@ -272,6 +274,14 @@ Set-Content -Path $htmlPath -Value $html -Encoding UTF8
 
 ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $outputFile
 Remove-Item $htmlPath -ErrorAction SilentlyContinue
+
+$printedBy = if ($env:USERNAME) { $env:USERNAME } else { "Generate-NameTag" }
+foreach ($attendee in $attendees) {
+    Invoke-SqliteQuery -DataSource $dbPath -Query @"
+INSERT OR REPLACE INTO PrintedBadges (Barcode, PrintedAt, PrintedBy)
+VALUES (@Barcode, datetime('now'), @PrintedBy)
+"@ -SqlParameters @{ Barcode = $attendee.Barcode; PrintedBy = $printedBy }
+}
 
 Write-Host "Badges written to: $outputFile" -ForegroundColor Green
 Write-Host "  $([math]::Ceiling($attendees.Count / 6)) sheet(s), $($attendees.Count) badge(s) total" -ForegroundColor DarkGray
