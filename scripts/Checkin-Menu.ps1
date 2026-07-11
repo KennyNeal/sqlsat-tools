@@ -39,8 +39,6 @@ try {
     }
     $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
 
-    Import-Module PSSQLite -ErrorAction Stop
-
     $scriptsDir = $PSScriptRoot
     $repoRoot   = Join-Path $scriptsDir ".."
     $dbPath     = Join-Path $repoRoot $config.database.path
@@ -57,7 +55,20 @@ try {
     Add-Type -Path $libPath
 
     . (Join-Path $scriptsDir "Badge-Helpers.ps1")
+    . (Join-Path $scriptsDir "Data-Access.ps1")
     . (Join-Path $scriptsDir "Checkin-Core.ps1")
+
+    $dataContext = New-DataContext -Config $config
+
+    if ($dataContext.AzureEnabled) {
+        Write-Host "  Checking Azure SQL and pulling the latest shared data..." -ForegroundColor DarkGray
+        if (Sync-FromAzure -DataContext $dataContext) {
+            Write-Host "  Up to date with Azure." -ForegroundColor DarkGray
+        } else {
+            Write-Host "  Azure unreachable — starting with the local cache. This desk will queue" -ForegroundColor Yellow
+            Write-Host "  writes and catch up automatically once the connection is back." -ForegroundColor Yellow
+        }
+    }
 
     $printerName = if ($config.PSObject.Properties['badge'] -and $config.badge.walkinPrinter) {
         $config.badge.walkinPrinter
@@ -103,7 +114,7 @@ function New-WalkinInteractive {
         }
     }
 
-    $attendee = New-WalkinRecord -DbPath $dbPath -FirstName $firstName -LastName $lastName `
+    $attendee = Add-Attendee -DataContext $dataContext -FirstName $firstName -LastName $lastName `
         -Email $walkinEmail -Company $company -JobTitle $jobTitle
 
     Write-Host "  Added! (This is a local walk-in — a grown-up will need to add a real" -ForegroundColor DarkYellow
@@ -149,9 +160,9 @@ function Invoke-CheckinLoop {
 
         try {
             $matches = if ($lookup -match '@') {
-                Find-Attendees -DbPath $dbPath -Email $lookup
+                Get-AttendeesByOrderOrEmail -DataContext $dataContext -Email $lookup
             } else {
-                Find-Attendees -DbPath $dbPath -OrderId $lookup
+                Get-AttendeesByOrderOrEmail -DataContext $dataContext -OrderId $lookup
             }
             $attendee = Select-AttendeeFromMatches -Matches $matches -PracticeMode:$PracticeMode
 
@@ -172,7 +183,7 @@ function Invoke-CheckinLoop {
             }
 
             Write-Host "  Printing..." -ForegroundColor Cyan
-            Send-BadgeToPrinter -Attendee $attendee -DbPath $dbPath -OutputDir $outputDir -PrinterName $printerName
+            Send-BadgeToPrinter -Attendee $attendee -DataContext $dataContext -OutputDir $outputDir -PrinterName $printerName
             Write-Host "  Printed badge for $($attendee.FirstName) $($attendee.LastName)." -ForegroundColor Green
         } catch {
             Write-Host "  Something went wrong: $($_.Exception.Message)" -ForegroundColor Red
@@ -188,9 +199,11 @@ function Invoke-EventbriteSync {
     Write-Host ""
 
     $maxAttempts = 3
+    $succeeded = $false
     for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
         try {
             & (Join-Path $scriptsDir "Import-Attendees.ps1") -Config $config
+            $succeeded = $true
             break
         } catch {
             if ($attempt -lt $maxAttempts) {
@@ -203,6 +216,21 @@ function Invoke-EventbriteSync {
             }
         }
     }
+
+    # The import itself only touched local SQLite (fast) and queued the same
+    # rows for Azure — push that queue now so other desks pick up the new
+    # registrations without waiting for someone to notice and hit option 5.
+    if ($succeeded -and $dataContext.AzureEnabled) {
+        if (Test-AzureReachable -DataContext $dataContext) {
+            Write-Host "  Sending the new registrations to Azure..." -ForegroundColor Cyan
+            $drained = Sync-PendingWrites -DataContext $dataContext
+            Write-Host "  Sent $drained update(s) to Azure." -ForegroundColor Green
+        } else {
+            Write-Host "  Azure's unreachable right now — the new registrations are queued and" -ForegroundColor Yellow
+            Write-Host "  will send automatically once the connection is back." -ForegroundColor Yellow
+        }
+    }
+
     Wait-ForEnter
 }
 
@@ -216,14 +244,49 @@ function Show-UnsyncedWalkins {
     Wait-ForEnter
 }
 
+function Invoke-AzureSyncNow {
+    Write-Banner
+    if (-not $dataContext.AzureEnabled) {
+        Write-Host "  Azure sync isn't turned on for this event (azure.enabled is false)." -ForegroundColor Yellow
+        Wait-ForEnter
+        return
+    }
+
+    Write-Host "  Checking Azure SQL..." -ForegroundColor Cyan
+    if (-not (Test-AzureReachable -DataContext $dataContext)) {
+        Write-Host "  Still can't reach Azure. Anything printed/added here is safely queued and" -ForegroundColor Yellow
+        Write-Host "  will sync automatically once the connection is back." -ForegroundColor Yellow
+        Wait-ForEnter
+        return
+    }
+
+    $drained = Sync-PendingWrites -DataContext $dataContext
+    if ($drained -gt 0) { Write-Host "  Sent $drained queued update(s) to Azure." -ForegroundColor Green }
+
+    if (Sync-FromAzure -DataContext $dataContext) {
+        Write-Host "  Pulled the latest from Azure — this desk now matches every other desk." -ForegroundColor Green
+    } else {
+        Write-Host "  Connected briefly but the pull failed — try again in a moment." -ForegroundColor Yellow
+    }
+    Wait-ForEnter
+}
+
 # ── Main menu ────────────────────────────────────────────────────────────────
 
 while ($true) {
+    # Opportunistic: if Azure just came back, quietly catch this desk up
+    # before showing the menu, so a volunteer doesn't have to remember to.
+    if ($dataContext.AzureEnabled -and -not $dataContext.AzureReachable -and (Test-AzureReachable -DataContext $dataContext)) {
+        Sync-PendingWrites -DataContext $dataContext | Out-Null
+        Sync-FromAzure -DataContext $dataContext | Out-Null
+    }
+
     Write-Banner
     Write-Host "  [1] Check in an attendee" -ForegroundColor White
     Write-Host "  [2] Practice mode (no printing)" -ForegroundColor White
     Write-Host "  [3] Sync new registrations from Eventbrite" -ForegroundColor White
     Write-Host "  [4] Show walk-ins not yet in Eventbrite" -ForegroundColor White
+    Write-Host "  [5] Sync now with Azure (other desks)" -ForegroundColor White
     Write-Host "  [Q] Quit" -ForegroundColor White
     Write-Host ""
     $choice = Read-Host "Pick an option"
@@ -233,6 +296,7 @@ while ($true) {
         '2' { Invoke-CheckinLoop -PracticeMode }
         '3' { Invoke-EventbriteSync }
         '4' { Show-UnsyncedWalkins }
+        '5' { Invoke-AzureSyncNow }
         'Q' { Write-Host ""; Write-Host "  Bye! Thanks for helping with check-in." -ForegroundColor Cyan; return }
         default { }
     }

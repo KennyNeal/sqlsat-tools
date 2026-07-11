@@ -58,4 +58,18 @@ CREATE TABLE IF NOT EXISTS PrintedBadges (
 )
 "@
 
+# Local-only queue of writes made while Azure SQL was unreachable, drained by
+# Sync-PendingWrites once connectivity returns. Never mirrored to Azure.
+Invoke-SqliteQuery -DataSource $dbPath -Query @"
+CREATE TABLE IF NOT EXISTS PendingWrites (
+    Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    Operation    TEXT NOT NULL,
+    Barcode      TEXT NOT NULL,
+    PayloadJson  TEXT NOT NULL,
+    CreatedAt    TEXT DEFAULT (datetime('now')),
+    Attempts     INTEGER DEFAULT 0,
+    LastError    TEXT
+)
+"@
+
 Write-Host "Database ready: $dbPath" -ForegroundColor Green

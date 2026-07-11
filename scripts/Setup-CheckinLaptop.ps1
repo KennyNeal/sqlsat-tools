@@ -3,9 +3,12 @@
     One-time setup for a second check-in laptop: installs dependencies,
     configures the secret vault, and gets event.config.json/event.db in place.
 .DESCRIPTION
-    Run this once on a laptop that will run Start-Checkin.bat as an
-    independent check-in desk (its own local copy of event.db — not a live
-    shared database with any other laptop; see issue for multi-desk support).
+    Run this once on a laptop that will run Start-Checkin.bat as a check-in
+    desk. If azure.enabled is true in event.config.json, this desk shares
+    live state (check-ins, badge prints) with every other desk via Azure
+    SQL — its local event.db is just a warm cache that self-populates on
+    first run and queues writes during any network drop. If azure.enabled
+    is false, this laptop runs the older local-only, single-desk model.
 
     Assumes the sqlsat-tools repo has already been cloned or copied onto this
     laptop and this script is being run from inside it.
@@ -119,15 +122,52 @@ if (Test-Path $configPath) {
 Write-Step "Checking event.db"
 $config = if (Test-Path $configPath) { Get-Content -Raw $configPath | ConvertFrom-Json } else { $null }
 $dbPath = if ($config) { Join-Path $repoRoot $config.database.path } else { Join-Path $repoRoot "event.db" }
+$azureEnabled = $config -and $config.PSObject.Properties['azure'] -and $config.azure.enabled
+
 if (Test-Path $dbPath) {
     Write-Ok "Found at $dbPath"
-    Write-Warn2 "This is an INDEPENDENT copy — it will not see badges printed on any other"
-    Write-Warn2 "laptop, and vice versa. Copy the latest event.db from the primary laptop"
-    Write-Warn2 "right before the event so attendee data is current."
+    if (-not $azureEnabled) {
+        Write-Warn2 "azure.enabled is false, so this is an INDEPENDENT copy — it will not see"
+        Write-Warn2 "badges printed on any other laptop, and vice versa. Copy the latest event.db"
+        Write-Warn2 "from the primary laptop right before the event so attendee data is current."
+    }
 } elseif ($config) {
-    Write-Warn2 "Not found. Copy event.db from the primary laptop into the repo root, or run:"
+    Write-Warn2 "Not found. Run:"
     Write-Warn2 "  .\scripts\Initialize-Database.ps1 -Config `$config"
-    Write-Warn2 "to create an empty one (only useful if this laptop is walk-ins only)."
+    if ($azureEnabled) {
+        Write-Warn2 "It'll be empty at first but self-populates from Azure SQL on the first"
+        Write-Warn2 "Checkin-Menu.ps1 run — no need to copy event.db from another laptop."
+    } else {
+        Write-Warn2 "Then copy event.db from the primary laptop, or run it here as walk-ins only."
+    }
+}
+
+if ($azureEnabled) {
+    Write-Step "Checking Azure SQL connectivity"
+    if (-not (Get-SecretInfo -Name $config.azure.authSecretName -ErrorAction SilentlyContinue)) {
+        Write-Warn2 "Azure SQL password secret '$($config.azure.authSecretName)' isn't set on this laptop."
+        $answer = Read-Host "  Set it now? (y/N)"
+        if ($answer -match '^[Yy]') {
+            $azurePassword = Read-Host "  Paste the Azure SQL password" -AsSecureString
+            Set-Secret -Name $config.azure.authSecretName -SecureStringSecret $azurePassword
+            Write-Ok "Saved"
+        }
+    } else {
+        Write-Ok "Secret '$($config.azure.authSecretName)' is set"
+    }
+
+    if ((Get-SecretInfo -Name $config.azure.authSecretName -ErrorAction SilentlyContinue)) {
+        try {
+            . (Join-Path $repoRoot "scripts\Data-Access.ps1")
+            $ctx = New-DataContext -Config $config
+            $detail = Test-DatabaseReadiness -DataContext $ctx
+            Write-Ok "Azure SQL reachable — $detail"
+        } catch {
+            Write-Warn2 "Could not confirm Azure SQL is reachable: $($_.Exception.Message)"
+            Write-Warn2 "This desk will still work — it'll queue writes locally and catch up once"
+            Write-Warn2 "the connection is sorted out. Worth fixing before event day, though."
+        }
+    }
 }
 
 Write-Step "Checking lib\QRCoder.dll"

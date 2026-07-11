@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored —
+# don't commit it if you put anything sensitive in here (none of these
+# defaults are sensitive, but the sql_server_name must be globally unique
+# across all of Azure, so you'll likely need to change it).
+
+resource_group_name = "rg-sqlsat-checkin"
+location             = "eastus"
+sql_server_name      = "sql-dodbr26-checkin"   # must be globally unique
+sql_database_name    = "attendees"
+sql_admin_username   = "checkinadmin"
+
+# Leave empty until you know the venue's egress IP; add firewall rules with
+# `az sql server firewall-rule create` closer to event day instead of
+# re-applying Terraform from an unknown network.
+allowed_client_ips = []

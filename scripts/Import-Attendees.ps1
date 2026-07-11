@@ -13,9 +13,8 @@ param(
     [PSCustomObject]$Config
 )
 
-Import-Module PSSQLite
-
-$dbPath = Join-Path $PSScriptRoot ".." $Config.database.path
+. (Join-Path $PSScriptRoot "Data-Access.ps1")
+$dataContext = New-DataContext -Config $Config
 
 # Load EventBrite token from SecretManagement
 try {
@@ -44,53 +43,32 @@ do {
 
 Write-Host "  Fetched $($all.Count) attendees" -ForegroundColor Green
 
-$upsertSql = @"
-INSERT OR REPLACE INTO Attendees
-    (Barcode, OrderId, OrderDate, FirstName, LastName, Email, Company, JobTitle,
-     LunchType, TicketType, AttendeeStatus, IsVolunteer, TwitterHandle, Website, UpdatedAt)
-VALUES
-    (@Barcode, @OrderId, @OrderDate, @FirstName, @LastName, @Email, @Company, @JobTitle,
-     @LunchType, @TicketType, @AttendeeStatus, @IsVolunteer, @TwitterHandle, @Website, datetime('now'))
-"@
+$rows = [System.Collections.Generic.List[hashtable]]::new()
+foreach ($a in $all) {
+    $profile = $a.profile
+    $barcode = ($a.barcodes | Select-Object -First 1).barcode
+    if (-not $barcode) { continue }
 
-# One connection and one transaction for the whole loop — a connection (and
-# implicit transaction) per row makes a few-hundred-row import take minutes.
-$conn = New-SQLiteConnection -DataSource $dbPath
-$imported = 0
-try {
-    Invoke-SqliteQuery -SQLiteConnection $conn -Query "BEGIN"
-    foreach ($a in $all) {
-        $profile = $a.profile
-        $barcode = ($a.barcodes | Select-Object -First 1).barcode
-        if (-not $barcode) { continue }
+    $answers = $a.answers
 
-        $answers = $a.answers
-
-        Invoke-SqliteQuery -SQLiteConnection $conn -Query $upsertSql -SqlParameters @{
-            Barcode        = $barcode
-            OrderId        = $a.order_id
-            OrderDate      = $a.created
-            FirstName      = $profile.first_name
-            LastName       = $profile.last_name
-            Email          = $profile.email
-            Company        = $profile.company
-            JobTitle       = $profile.job_title
-            LunchType      = Get-Answer $answers "Lunch"
-            TicketType     = $a.ticket_class_name
-            AttendeeStatus = $a.status
-            IsVolunteer    = if ((Get-Answer $answers "volunteer") -eq "Yes") { 1 } else { 0 }
-            TwitterHandle  = Get-Answer $answers "Twitter"
-            Website        = $profile.website
-        }
-        $imported++
-    }
-    Invoke-SqliteQuery -SQLiteConnection $conn -Query "COMMIT"
-} catch {
-    try { Invoke-SqliteQuery -SQLiteConnection $conn -Query "ROLLBACK" } catch { }
-    throw
-} finally {
-    $conn.Close()
-    $conn.Dispose()
+    $rows.Add(@{
+        Barcode        = $barcode
+        OrderId        = $a.order_id
+        OrderDate      = $a.created
+        FirstName      = $profile.first_name
+        LastName       = $profile.last_name
+        Email          = $profile.email
+        Company        = $profile.company
+        JobTitle       = $profile.job_title
+        LunchType      = Get-Answer $answers "Lunch"
+        TicketType     = $a.ticket_class_name
+        AttendeeStatus = $a.status
+        IsVolunteer    = if ((Get-Answer $answers "volunteer") -eq "Yes") { 1 } else { 0 }
+        TwitterHandle  = Get-Answer $answers "Twitter"
+        Website        = $profile.website
+    })
 }
+
+$imported = Import-AttendeesFromEventbrite -DataContext $dataContext -Attendees $rows
 
 Write-Host "Import complete. Upserted $imported attendees." -ForegroundColor Green

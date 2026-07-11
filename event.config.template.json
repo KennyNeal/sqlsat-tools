@@ -36,6 +36,13 @@
   "database": {
     "path": "./event.db"
   },
+  "azure": {
+    "enabled": false,
+    "server": "your-server.database.windows.net",
+    "database": "your-database",
+    "username": "your-sql-login",
+    "authSecretName": "AzureSqlAuth"
+  },
   "badge": {
     "backgroundImage": "./assets/dod_badge_labelfit.png",
     "outputFile": "./output/badges.pdf",
