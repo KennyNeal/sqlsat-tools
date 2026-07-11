@@ -26,9 +26,9 @@ param(
     [string]$BackgroundImage = ""
 )
 
-Import-Module PSSQLite
+. (Join-Path $PSScriptRoot "Data-Access.ps1")
 
-$dbPath    = Join-Path $PSScriptRoot ".." $Config.database.path
+$dataContext = New-DataContext -Config $Config
 $outputFile = if ($Config.PSObject.Properties['badge'] -and $Config.badge.outputFile) {
     Join-Path $PSScriptRoot ".." $Config.badge.outputFile
 } else {
@@ -243,21 +243,7 @@ window.addEventListener('DOMContentLoaded', function() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 # Query attendees
-$emailFilter = if ($Email) { "a.Email = @Email" } else { $null }
-$nullFilter  = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
-$conditions  = @($emailFilter, $nullFilter) | Where-Object { $_ }
-$whereClause = if ($conditions) { "WHERE " + ($conditions -join " AND ") } else { "" }
-
-$query = @"
-SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType
-FROM   Attendees a
-LEFT   JOIN PrintedBadges p ON a.Barcode = p.Barcode
-$whereClause
-ORDER  BY a.LastName, a.FirstName
-"@
-
-$sqlParams = if ($Email) { @{ Email = $Email } } else { @{} }
-$attendees = Invoke-SqliteQuery -DataSource $dbPath -Query $query -SqlParameters $sqlParams
+$attendees = Get-AttendeesForNameTag -DataContext $dataContext -Email $Email -Force:$Force
 
 if ($attendees.Count -eq 0) {
     Write-Host "No attendees need badge generation. Use -Force to regenerate all." -ForegroundColor Yellow
@@ -277,10 +263,7 @@ Remove-Item $htmlPath -ErrorAction SilentlyContinue
 
 $printedBy = if ($env:USERNAME) { $env:USERNAME } else { "Generate-NameTag" }
 foreach ($attendee in $attendees) {
-    Invoke-SqliteQuery -DataSource $dbPath -Query @"
-INSERT OR REPLACE INTO PrintedBadges (Barcode, PrintedAt, PrintedBy)
-VALUES (@Barcode, datetime('now'), @PrintedBy)
-"@ -SqlParameters @{ Barcode = $attendee.Barcode; PrintedBy = $printedBy }
+    Set-BadgePrinted -DataContext $dataContext -Barcode $attendee.Barcode -PrintedBy $printedBy
 }
 
 Write-Host "Badges written to: $outputFile" -ForegroundColor Green

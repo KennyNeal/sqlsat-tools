@@ -27,14 +27,13 @@ param(
     [string]$Email
 )
 
-Import-Module PSSQLite
-
 . "$PSScriptRoot\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
 . "$PSScriptRoot\Web-Helpers.ps1"
 . "$PSScriptRoot\Badge-Helpers.ps1"
+. "$PSScriptRoot\Data-Access.ps1"
 
-$dbPath      = Join-Path $PSScriptRoot ".." $Config.database.path
+$dataContext = New-DataContext -Config $Config
 $outputDir   = Join-Path $PSScriptRoot ".." $Config.speedpass.outputDir
 
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
@@ -169,22 +168,7 @@ Write-Host "Loading sponsor logos for raffle tiers: $($Config.speedpass.raffleTi
 $sponsorLogos = Get-SponsorLogos -Config $Config -Tiers $Config.speedpass.raffleTiers
 
 # Query attendees
-$emailFilter = if ($Email) { "a.Email = @Email" } else { $null }
-$nullFilter  = if (-not $Force) { "p.SpeedPassGeneratedAt IS NULL" } else { $null }
-$conditions  = @($emailFilter, $nullFilter) | Where-Object { $_ }
-$whereClause = if ($conditions) { "WHERE " + ($conditions -join " AND ") } else { "" }
-
-$query = @"
-SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle,
-       a.LunchType, a.TwitterHandle, a.Website
-FROM   Attendees a
-LEFT   JOIN ProcessedAttendees p ON a.Barcode = p.Barcode
-$whereClause
-ORDER  BY a.LastName, a.FirstName
-"@
-
-$sqlParams = if ($Email) { @{ Email = $Email } } else { @{} }
-$attendees = Invoke-SqliteQuery -DataSource $dbPath -Query $query -SqlParameters $sqlParams
+$attendees = Get-AttendeesForSpeedPass -DataContext $dataContext -Email $Email -Force:$Force
 
 if ($attendees.Count -eq 0) {
     Write-Host "No attendees need SpeedPass generation. Use -Force to regenerate all." -ForegroundColor Yellow
@@ -204,11 +188,7 @@ foreach ($attendee in $attendees) {
     ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $pdfPath
     Remove-Item $htmlPath -ErrorAction SilentlyContinue
 
-    Invoke-SqliteQuery -DataSource $dbPath -Query @"
-INSERT INTO ProcessedAttendees (Barcode, SpeedPassPath, SpeedPassGeneratedAt)
-VALUES (@Barcode, @Path, datetime('now'))
-ON CONFLICT(Barcode) DO UPDATE SET SpeedPassPath=@Path, SpeedPassGeneratedAt=datetime('now')
-"@ -SqlParameters @{ Barcode = $attendee.Barcode; Path = $pdfPath }
+    Set-SpeedPassGenerated -DataContext $dataContext -Barcode $attendee.Barcode -Path $pdfPath
 
     Write-Host "  Generated: $safeName.pdf" -ForegroundColor Green
     $generated++

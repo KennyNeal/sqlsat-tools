@@ -26,9 +26,9 @@ param(
     [switch]$ShowBanner
 )
 
-Import-Module PSSQLite
+. (Join-Path $PSScriptRoot "Data-Access.ps1")
 
-$dbPath          = Join-Path $PSScriptRoot ".." $Config.database.path
+$dataContext     = New-DataContext -Config $Config
 $templateFolder  = Join-Path $PSScriptRoot "..\templates"
 $batchSize       = $Config.email.batchSize
 $delaySeconds    = $Config.email.delaySeconds
@@ -52,14 +52,7 @@ $bannerHtml = if ($ShowBanner) {
 } else { "" }
 
 # Find attendees ready to email
-$attendees = Invoke-SqliteQuery -DataSource $dbPath -Query @"
-SELECT a.Barcode, a.FirstName, a.LastName, a.Email, p.SpeedPassPath
-FROM   Attendees a
-JOIN   ProcessedAttendees p ON a.Barcode = p.Barcode
-WHERE  p.SpeedPassGeneratedAt IS NOT NULL
-AND    p.EmailedAt IS NULL
-ORDER  BY a.LastName, a.FirstName
-"@
+$attendees = Get-AttendeesForEmail -DataContext $dataContext
 
 if ($attendees.Count -eq 0) {
     Write-Host "No attendees pending email." -ForegroundColor Yellow
@@ -82,55 +75,40 @@ $subject = $Config.email.subject
 $success = 0
 $errors  = 0
 
-# One connection for all the EmailedAt updates instead of one per row.
-$conn = New-SQLiteConnection -DataSource $dbPath
-try {
-    for ($i = 0; $i -lt $attendees.Count; $i += $batchSize) {
-        $batch     = $attendees[$i..[Math]::Min($i + $batchSize - 1, $attendees.Count - 1)]
-        $batchNum  = [Math]::Floor($i / $batchSize) + 1
-        $totalBatches = [Math]::Ceiling($attendees.Count / $batchSize)
-        Write-Host "`nBatch $batchNum of $totalBatches ($($batch.Count) emails)..." -ForegroundColor Cyan
+for ($i = 0; $i -lt $attendees.Count; $i += $batchSize) {
+    $batch     = $attendees[$i..[Math]::Min($i + $batchSize - 1, $attendees.Count - 1)]
+    $batchNum  = [Math]::Floor($i / $batchSize) + 1
+    $totalBatches = [Math]::Ceiling($attendees.Count / $batchSize)
+    Write-Host "`nBatch $batchNum of $totalBatches ($($batch.Count) emails)..." -ForegroundColor Cyan
 
-        $sentBarcodes = @()
-        foreach ($a in $batch) {
-            if (-not (Test-Path $a.SpeedPassPath)) {
-                Write-Host "  SKIP (PDF missing): $($a.Email)" -ForegroundColor Yellow
-                continue
-            }
-
-            $body    = $bodyTemplate -replace '{{FirstName}}', $a.FirstName `
-                                     -replace '{{EventName}}', $Config.event.name `
-                                     -replace '{{Hashtag}}',   $Config.event.hashtag `
-                                     -replace '{{BANNER}}',    $bannerHtml
-            $sendTo  = if ($TestEmail) { $TestEmail } else { $a.Email }
-
-            try {
-                Send-MailMessage -To $sendTo -From $from -Subject $subject -Body $body `
-                    -SmtpServer $smtp -Port $port -UseSsl -Credential $cred `
-                    -Attachments $a.SpeedPassPath -BodyAsHtml -WarningAction SilentlyContinue
-                Write-Host "  Sent: $($a.Email)" -ForegroundColor Green
-                $sentBarcodes += $a.Barcode
-                $success++
-            } catch {
-                Write-Host "  ERROR $($a.Email): $_" -ForegroundColor Red
-                $errors++
-            }
-
-            if ($delaySeconds -gt 0) { Start-Sleep -Seconds $delaySeconds }
+    foreach ($a in $batch) {
+        if (-not (Test-Path $a.SpeedPassPath)) {
+            Write-Host "  SKIP (PDF missing): $($a.Email)" -ForegroundColor Yellow
+            continue
         }
 
-        # Batch-mark as emailed
-        foreach ($barcode in $sentBarcodes) {
-            Invoke-SqliteQuery -SQLiteConnection $conn -Query @"
-UPDATE ProcessedAttendees SET EmailedAt = datetime('now') WHERE Barcode = @Barcode
-"@ -SqlParameters @{ Barcode = $barcode }
+        $body    = $bodyTemplate -replace '{{FirstName}}', $a.FirstName `
+                                 -replace '{{EventName}}', $Config.event.name `
+                                 -replace '{{Hashtag}}',   $Config.event.hashtag `
+                                 -replace '{{BANNER}}',    $bannerHtml
+        $sendTo  = if ($TestEmail) { $TestEmail } else { $a.Email }
+
+        try {
+            Send-MailMessage -To $sendTo -From $from -Subject $subject -Body $body `
+                -SmtpServer $smtp -Port $port -UseSsl -Credential $cred `
+                -Attachments $a.SpeedPassPath -BodyAsHtml -WarningAction SilentlyContinue
+            Write-Host "  Sent: $($a.Email)" -ForegroundColor Green
+            Set-SpeedPassEmailed -DataContext $dataContext -Barcode $a.Barcode
+            $success++
+        } catch {
+            Write-Host "  ERROR $($a.Email): $_" -ForegroundColor Red
+            $errors++
         }
 
-        if ($i + $batchSize -lt $attendees.Count) { Start-Sleep -Seconds ($delaySeconds * 2) }
+        if ($delaySeconds -gt 0) { Start-Sleep -Seconds $delaySeconds }
     }
-} finally {
-    $conn.Close()
-    $conn.Dispose()
+
+    if ($i + $batchSize -lt $attendees.Count) { Start-Sleep -Seconds ($delaySeconds * 2) }
 }
 
 Write-Host "`nEmail complete. Sent: $success  Errors: $errors" -ForegroundColor $(if ($errors -gt 0) { 'Yellow' } else { 'Green' })

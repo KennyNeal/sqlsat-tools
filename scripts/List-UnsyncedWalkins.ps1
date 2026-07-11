@@ -17,17 +17,10 @@ param(
     [PSCustomObject]$Config
 )
 
-Import-Module PSSQLite
+. (Join-Path $PSScriptRoot "Data-Access.ps1")
+$dataContext = New-DataContext -Config $Config
 
-$dbPath = Join-Path $PSScriptRoot ".." $Config.database.path
-
-$walkins = Invoke-SqliteQuery -DataSource $dbPath -Query @"
-SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.OrderDate, p.PrintedAt
-FROM   Attendees a
-LEFT JOIN PrintedBadges p ON p.Barcode = a.Barcode
-WHERE  a.OrderId = 'WALKIN'
-ORDER  BY a.OrderDate
-"@
+$walkins = Get-UnsyncedWalkins -DataContext $dataContext
 
 if ($walkins.Count -eq 0) {
     Write-Host "No unsynced walk-ins." -ForegroundColor Green

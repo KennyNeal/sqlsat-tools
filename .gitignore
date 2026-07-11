@@ -5,3 +5,10 @@ cache/
 *.xml
 *.log
 __pycache__/
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+infra/*.tfplan

@@ -57,9 +57,6 @@ param(
     [string]$PreviewFormat = 'Html'
 )
 
-Import-Module PSSQLite
-
-$dbPath      = Join-Path $PSScriptRoot ".." $Config.database.path
 $outputDir   = Join-Path $PSScriptRoot "..\output"
 $printerName = if ($Printer) {
     $Printer
@@ -72,11 +69,14 @@ $printerName = if ($Printer) {
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
 . (Join-Path $PSScriptRoot "Badge-Helpers.ps1")
+. (Join-Path $PSScriptRoot "Data-Access.ps1")
 . (Join-Path $PSScriptRoot "Checkin-Core.ps1")
 
+$dataContext = New-DataContext -Config $Config
+
 # ── Interactive quick-add / multi-match picker ────────────────────────────
-# New-LabelHtml, Find-Attendees, and the walk-in INSERT now live in
-# Checkin-Core.ps1 so Checkin-Menu.ps1 can reuse them without Read-Host.
+# New-LabelHtml lives in Checkin-Core.ps1; attendee lookup/insert live in
+# Data-Access.ps1 so Checkin-Menu.ps1 can reuse them without Read-Host.
 
 function New-WalkinAttendeeInteractive {
     Write-Host "  No matching attendee found. Quick-add a walk-in:" -ForegroundColor Yellow
@@ -89,7 +89,7 @@ function New-WalkinAttendeeInteractive {
     $company  = Read-Host "  Company (optional)"
     $jobTitle = Read-Host "  Job title (optional)"
 
-    $attendee = New-WalkinRecord -DbPath $dbPath -FirstName $firstName -LastName $lastName `
+    $attendee = Add-Attendee -DataContext $dataContext -FirstName $firstName -LastName $lastName `
         -Email $walkinEmail -Company $company -JobTitle $jobTitle
 
     Write-Host "  Added locally only — Eventbrite has no API to create a real registration." -ForegroundColor Yellow
@@ -121,7 +121,7 @@ function Select-Attendee {
 function Invoke-PrintOne {
     param([string]$OrderIdArg, [string]$EmailArg)
 
-    $matches = Find-Attendees -DbPath $dbPath -OrderId $OrderIdArg -Email $EmailArg
+    $matches = Get-AttendeesByOrderOrEmail -DataContext $dataContext -OrderId $OrderIdArg -Email $EmailArg
     $attendee = Select-Attendee -Matches $matches
 
     if ($Preview) {
@@ -140,7 +140,7 @@ function Invoke-PrintOne {
         }
     }
 
-    Send-BadgeToPrinter -Attendee $attendee -DbPath $dbPath -OutputDir $outputDir -PrinterName $printerName
+    Send-BadgeToPrinter -Attendee $attendee -DataContext $dataContext -OutputDir $outputDir -PrinterName $printerName
 
     Write-Host "  Printed badge for $($attendee.FirstName) $($attendee.LastName)." -ForegroundColor Green
 }

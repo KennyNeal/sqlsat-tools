@@ -26,6 +26,7 @@ param(
 . "$PSScriptRoot\Web-Helpers.ps1"
 . "$PSScriptRoot\Badge-Helpers.ps1"
 . "$PSScriptRoot\Get-EventLogo.ps1"
+. "$PSScriptRoot\Data-Access.ps1"
 
 $script:results = [System.Collections.Generic.List[object]]::new()
 
@@ -255,6 +256,14 @@ Test-Check "event.db initialized" -WarnOnly {
     if ($missing) { throw "missing table(s): $($missing -join ', ') — run Initialize-Database.ps1" }
     $count = (Invoke-SqliteQuery -DataSource $dbPath -Query "SELECT COUNT(*) AS c FROM Attendees").c
     "$count attendees"
+}
+
+Test-Check "Azure SQL (shared multi-desk store)" -WarnOnly {
+    if (-not $config.PSObject.Properties['azure'] -or -not $config.azure.enabled) {
+        throw "azure.enabled is false — running local-only, single-desk mode"
+    }
+    $ctx = New-DataContext -Config $config
+    Test-DatabaseReadiness -DataContext $ctx
 }
 
 # ── Summary ───────────────────────────────────────────────────────────────────

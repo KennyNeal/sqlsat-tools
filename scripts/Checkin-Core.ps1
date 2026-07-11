@@ -1,70 +1,17 @@
 <#
 .SYNOPSIS
     Shared, non-interactive check-in logic used by Print-WalkinBadge.ps1 and
-    Checkin-Menu.ps1: attendee lookup, walk-in creation, label rendering, and
-    printing. No Read-Host/Write-Host prompts live here — callers own all
-    interaction so this file can be reused by any front end.
+    Checkin-Menu.ps1: label rendering and printing. No Read-Host/Write-Host
+    prompts live here — callers own all interaction so this file can be
+    reused by any front end.
 .DESCRIPTION
     Requires Badge-Helpers.ps1 (New-VCard, New-QRBase64, ConvertTo-PdfViaEdge,
-    Send-ToPrinter) and the PSSQLite module to already be loaded by the caller.
+    Send-ToPrinter) and Data-Access.ps1 to already be loaded by the caller.
+    Attendee lookup and walk-in creation now live in Data-Access.ps1
+    (Get-AttendeesByOrderOrEmail, Add-Attendee) — callers should use those
+    directly instead of the Find-Attendees/New-WalkinRecord wrappers that
+    used to live here.
 #>
-
-function Find-Attendees {
-    param([Parameter(Mandatory)][string]$DbPath, [string]$OrderId, [string]$Email)
-
-    $query = @"
-SELECT a.Barcode, a.OrderId, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType, p.PrintedAt
-FROM   Attendees a
-LEFT JOIN PrintedBadges p ON p.Barcode = a.Barcode
-WHERE  ($(if ($OrderId) { "a.OrderId = @OrderId" } else { "a.Email = @Email" }))
-ORDER  BY a.LastName, a.FirstName
-"@
-    $params = if ($OrderId) { @{ OrderId = $OrderId } } else { @{ Email = $Email } }
-    Invoke-SqliteQuery -DataSource $DbPath -Query $query -SqlParameters $params
-}
-
-function New-WalkinRecord {
-    <#
-    .SYNOPSIS
-        Inserts a quick-add walk-in attendee. Pure function — caller has
-        already collected and validated FirstName/LastName/Email.
-    #>
-    param(
-        [Parameter(Mandatory)][string]$DbPath,
-        [Parameter(Mandatory)][string]$FirstName,
-        [Parameter(Mandatory)][string]$LastName,
-        [Parameter(Mandatory)][string]$Email,
-        [string]$Company,
-        [string]$JobTitle
-    )
-
-    $barcode = "WALKIN-$([guid]::NewGuid().ToString())"
-    Invoke-SqliteQuery -DataSource $DbPath -Query @"
-INSERT INTO Attendees
-    (Barcode, OrderId, OrderDate, FirstName, LastName, Email, Company, JobTitle, TicketType, AttendeeStatus)
-VALUES
-    (@Barcode, 'WALKIN', datetime('now'), @FirstName, @LastName, @Email, @Company, @JobTitle, 'Walk-in', 'attending')
-"@ -SqlParameters @{
-        Barcode   = $barcode
-        FirstName = $FirstName
-        LastName  = $LastName
-        Email     = $Email
-        Company   = $Company
-        JobTitle  = $JobTitle
-    }
-
-    return [PSCustomObject]@{
-        Barcode   = $barcode
-        OrderId   = 'WALKIN'
-        FirstName = $FirstName
-        LastName  = $LastName
-        Email     = $Email
-        Company   = $Company
-        JobTitle  = $JobTitle
-        LunchType = $null
-        PrintedAt = $null
-    }
-}
 
 # ── Label HTML builder (2.4in x 3.9in landscape, no background art) ──────────
 
@@ -169,7 +116,7 @@ function Send-BadgeToPrinter {
     #>
     param(
         [Parameter(Mandatory)]$Attendee,
-        [Parameter(Mandatory)][string]$DbPath,
+        [Parameter(Mandatory)]$DataContext,
         [Parameter(Mandatory)][string]$OutputDir,
         [Parameter(Mandatory)][string]$PrinterName
     )
@@ -184,10 +131,7 @@ function Send-BadgeToPrinter {
 
     Send-ToPrinter -PdfPath $pdfPath -PrinterName $PrinterName
 
-    Invoke-SqliteQuery -DataSource $DbPath -Query @"
-INSERT OR REPLACE INTO PrintedBadges (Barcode, PrintedAt, PrintedBy)
-VALUES (@Barcode, datetime('now'), @PrintedBy)
-"@ -SqlParameters @{ Barcode = $Attendee.Barcode; PrintedBy = $env:USERNAME }
+    Set-BadgePrinted -DataContext $DataContext -Barcode $Attendee.Barcode -PrintedBy $env:USERNAME
 }
 
 function New-BadgePreview {
