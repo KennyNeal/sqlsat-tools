@@ -80,7 +80,10 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `raffleDeck.gridGroups` | Remaining tiers grouped onto shared grid slide(s), in order (e.g. `[["gold"],["silver","bronze"],["book"]]`) |
 | `raffleDeck.maxPerGridSlide` | Sponsors per grid slide before splitting onto another slide |
 | `raffleDeck.loopAdvanceSeconds` | Seconds each loop-deck slide stays up before auto-advancing |
+| `raffleDeck.heroTiers` | Sponsor tiers that get a manually-advanced hero slide in the raffle section; defaults to `speedpass.raffleTiers` if omitted |
+| `raffleDeck.heroLast` | Sponsor names to move to the end of the raffle hero section (still before `extraHeroSlides`), in the order listed |
 | `raffleDeck.excludeSponsors` | Sponsor names to skip in the raffle hero section (they still get a loop-deck recognition slide) — for sponsors not doing a drawing this year |
+| `raffleDeck.extraHeroSlides` | Extra raffle hero slides not sourced from sponsors.yaml, appended after every sponsor (e.g. the user group's own drawing): `[{"name","kicker","logoPath"}]`, `logoPath` relative to the repo root |
 | `raffleDeck.footerText` | Bottom-bar text for the raffle deck; defaults to `event.hashtag` |
 | `raffleDeck.outputFile` | Where the generated `.pptx` is written |
 

@@ -14,12 +14,18 @@
          raffle starts.
       2. "Raffle" -- starts with a "Raffle Time!" slide, then one
          manually-advanced hero slide per raffle-eligible sponsor
-         (speedpass.raffleTiers) to display while that sponsor does their
-         drawing, then a second copy of the evaluation QR slide. Sponsors
-         listed in raffleDeck.excludeSponsors are skipped here (they still
-         get their Recognition slide) -- useful since which sponsors are
-         actually doing a drawing often isn't confirmed until the day
-         before, and the Global sponsor typically opts out.
+         (raffleDeck.heroTiers, defaulting to speedpass.raffleTiers) to
+         display while that sponsor does their drawing, then any
+         raffleDeck.extraHeroSlides (non-sponsor drawings, e.g. the local
+         user group's own raffle, with a locally-supplied logo file), then
+         a second copy of the evaluation QR slide. Sponsors listed in
+         raffleDeck.excludeSponsors are skipped here (they still get their
+         Recognition slide) -- useful since which sponsors are actually
+         doing a drawing often isn't confirmed until the day before, or a
+         sponsor tier (e.g. Global) typically opts out but this year didn't.
+         Sponsors listed in raffleDeck.heroLast are moved to the end of the
+         sponsor hero slides (still before extraHeroSlides), e.g. to run a
+         sponsor's drawing right before the user group's.
     The deck's default "Show slides" range is left at "All" rather than
     pinned to Recognition, since pinning it breaks Shift+F5 ("Show From
     Current Slide") for every Raffle slide. So launch each section by name
@@ -65,12 +71,22 @@ $individualTiers = @(if ($raffleCfg.PSObject.Properties['individualTiers']) { $r
 $gridGroups      = @(if ($raffleCfg.PSObject.Properties['gridGroups']) { $raffleCfg.gridGroups } else { @(@('gold'), @('silver', 'bronze')) })
 $excludeSponsors = @(if ($raffleCfg.PSObject.Properties['excludeSponsors']) { $raffleCfg.excludeSponsors } else { @() })
 
+# Sponsor names in heroLast are pulled out of their normal tier position and
+# raffled last, in the order listed -- e.g. a sponsor whose drawing the
+# presenter wants to run right before a closing/non-sponsor hero slide.
+$heroLast        = @(if ($raffleCfg.PSObject.Properties['heroLast']) { $raffleCfg.heroLast } else { @() })
+
 $slideCfg       = $Config.slideTemplate
 $primaryColor   = if ($slideCfg.PSObject.Properties['primaryColor']) { $slideCfg.primaryColor } else { "013169" }
 $secondaryColor = if ($slideCfg.PSObject.Properties['secondaryColor']) { $slideCfg.secondaryColor } else { "F7C15D" }
 
 $raffleTiers = $Config.speedpass.raffleTiers
 if (-not $raffleTiers) { throw "speedpass.raffleTiers is not set in event.config.json — needed to know which sponsors get a raffle hero slide." }
+
+# heroTiers defaults to speedpass.raffleTiers but can be overridden independently --
+# e.g. to add "global" for a year where the Global sponsor opts in to the drawing
+# without also handing them a raffle-ticket stamp on the speedpass card.
+$heroTiers = @(if ($raffleCfg.PSObject.Properties['heroTiers']) { $raffleCfg.heroTiers } else { $raffleTiers })
 
 $workDir = Join-Path ([System.IO.Path]::GetTempPath()) "sqlsat-raffledeck-$([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $workDir | Out-Null
@@ -86,6 +102,32 @@ $logoPath = Join-Path $workDir "event-logo.png"
 # ── Sponsor logos (all tiers — the loop deck decides which ones to use) ────
 
 $groups = Get-SponsorLogoFiles -Config $Config -WorkDir $workDir
+
+# ── Extra raffle-only hero slides (not sourced from sponsors.yaml) ─────────
+# e.g. the local user group's own drawing, tacked on after every sponsor.
+
+$extraHeroSlides = [System.Collections.Generic.List[hashtable]]::new()
+if ($raffleCfg.PSObject.Properties['extraHeroSlides']) {
+    $i = 0
+    foreach ($extra in $raffleCfg.extraHeroSlides) {
+        $i++
+        $srcLogoPath = Join-Path $PSScriptRoot ".." $extra.logoPath
+        if (-not (Test-Path $srcLogoPath)) { throw "extraHeroSlides logo not found: $srcLogoPath" }
+        $ext = [System.IO.Path]::GetExtension($srcLogoPath)
+        $destLogoPath = Join-Path $workDir "extra-hero-$i$ext"
+        Copy-Item $srcLogoPath $destLogoPath
+        if ($ext -eq ".svg") {
+            $pngPath = Join-Path $workDir "extra-hero-$i.png"
+            ConvertTo-PngFromSvg -SvgPath $destLogoPath -PngPath $pngPath
+            if (Test-Path $pngPath) { $destLogoPath = $pngPath }
+        }
+        $extraHeroSlides.Add(@{
+            name     = $extra.name
+            kicker   = if ($extra.PSObject.Properties['kicker']) { $extra.kicker } else { $extra.name }
+            logoPath = $destLogoPath
+        })
+    }
+}
 
 # ── Session-evaluation QR code ──────────────────────────────────────────────
 
@@ -117,8 +159,10 @@ $manifest = @{
     maxPerGridSlide  = $maxPerGrid
     individualTiers  = $individualTiers
     gridGroups       = $gridGroups
-    heroTiers        = $raffleTiers
+    heroTiers        = $heroTiers
+    heroLast         = $heroLast
     excludeSponsors  = $excludeSponsors
+    extraHeroSlides  = $extraHeroSlides
     groups           = $groups
     outputPath       = (New-Object System.IO.FileInfo($outputFile)).FullName
 }

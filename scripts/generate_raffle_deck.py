@@ -9,11 +9,15 @@ Show > Recognition / Raffle):
     it loops continuously until Esc, so the presenter can run just this
     section as a screensaver before the raffle.
   Raffle -- manually advanced: a "Raffle Time!" intro slide, one hero slide
-    per raffle-eligible sponsor (shown while that sponsor does their
-    drawing), then a second copy of the evaluation QR slide. Sponsors
-    listed in raffleDeck.excludeSponsors (e.g. a Global sponsor that isn't
-    doing a drawing this year) still get their Recognition slide but are
-    skipped here.
+    per raffle-eligible sponsor (manifest["heroTiers"], shown while that
+    sponsor does their drawing), then any raffleDeck.extraHeroSlides (e.g.
+    the user group's own drawing, not sourced from sponsors.yaml), then a
+    second copy of the evaluation QR slide. Sponsors listed in
+    raffleDeck.excludeSponsors (e.g. a sponsor that isn't doing a drawing
+    this year) still get their Recognition slide but are skipped here.
+    Sponsors listed in raffleDeck.heroLast are pulled out of their normal
+    tier position and raffled last, in the order listed -- e.g. to run a
+    sponsor's drawing immediately before the extraHeroSlides.
 
 The deck's default "Show slides" range is deliberately left at "All", not
 pinned to the Recognition custom show -- pinning it breaks Shift+F5 ("Show
@@ -375,6 +379,8 @@ def main():
     ]
 
     excluded = set(manifest.get("excludeSponsors", []))
+    hero_last = manifest.get("heroLast", [])
+    deferred = {}  # sponsor name -> (sponsor, tier title), raffled last, in heroLast order
     for tier in manifest["heroTiers"]:
         group = by_tier.get(tier)
         if not group:
@@ -383,7 +389,22 @@ def main():
             if sponsor["name"] in excluded:
                 print(f"  Skipping raffle hero slide (excluded): {sponsor['name']}")
                 continue
+            if sponsor["name"] in hero_last:
+                deferred[sponsor["name"]] = (sponsor, group["title"])
+                continue
             raffle_slides.append(build_spotlight_slide(prs, manifest, sponsor, group["title"]))
+
+    for name in hero_last:
+        entry = deferred.get(name)
+        if not entry:
+            print(f"  Warning: heroLast sponsor '{name}' not found among heroTiers")
+            continue
+        sponsor, title = entry
+        raffle_slides.append(build_spotlight_slide(prs, manifest, sponsor, title))
+
+    for extra in manifest.get("extraHeroSlides", []):
+        sponsor = {"name": extra["name"], "logoPath": extra["logoPath"]}
+        raffle_slides.append(build_spotlight_slide(prs, manifest, sponsor, extra["kicker"]))
 
     raffle_slides.append(build_eval_slide(prs, manifest))
 
