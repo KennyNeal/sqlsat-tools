@@ -541,16 +541,27 @@ UPDATE ProcessedAttendees SET EmailedAt = datetime('now') WHERE Barcode = @Barco
 # ── Name tags (Generate-NameTag.ps1) ────────────────────────────────────────────
 
 function Get-AttendeesForNameTag {
-    param([Parameter(Mandatory)]$DataContext, [string]$Email, [switch]$Force)
+    param(
+        [Parameter(Mandatory)]$DataContext,
+        [string]$Email,
+        [switch]$Force,
+        [ValidateSet('Speaker', 'Attendee', 'All')]
+        [string]$Type = 'All'
+    )
 
-    $statusFilter = "a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')"
-    $emailFilter  = if ($Email) { "a.Email = @Email" } else { $null }
-    $nullFilter   = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
-    $conditions   = @($statusFilter, $emailFilter, $nullFilter) | Where-Object { $_ }
+    $statusFilter  = "a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')"
+    $emailFilter   = if ($Email) { "a.Email = @Email" } else { $null }
+    $nullFilter    = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
+    $typeFilter    = switch ($Type) {
+        'Speaker'  { "a.TicketType LIKE '%Speaker%'" }
+        'Attendee' { "(a.TicketType IS NULL OR a.TicketType NOT LIKE '%Speaker%')" }
+        default    { $null }
+    }
+    $conditions   = @($statusFilter, $emailFilter, $nullFilter, $typeFilter) | Where-Object { $_ }
     $whereClause  = "WHERE " + ($conditions -join " AND ")
 
     $query = @"
-SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType
+SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType, a.TicketType
 FROM   Attendees a
 LEFT   JOIN PrintedBadges p ON a.Barcode = p.Barcode
 $whereClause

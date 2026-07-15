@@ -13,23 +13,39 @@
     Generate a badge sheet for a single attendee by email address.
 .PARAMETER BackgroundImage
     Override path to the badge background PNG (default: Config.badge.backgroundImage).
+.PARAMETER Type
+    Which attendees to include, by ticket type: "Speaker" (TicketType contains
+    "Speaker" — badges get a red "SPEAKER" ribbon), "Attendee" (everyone else),
+    or "All" (default — everyone, with the ribbon added per-badge as appropriate).
+    Speaker-only runs default their output to Config.badge.speakerOutputFile
+    (or "speaker-badges.pdf") so they don't overwrite the regular badge run.
 .EXAMPLE
     .\Generate-NameTag.ps1 -Config $config
 .EXAMPLE
     .\Generate-NameTag.ps1 -Config $config -Email "jane.doe@example.com"
+.EXAMPLE
+    .\Generate-NameTag.ps1 -Config $config -Type Speaker
 #>
 param(
     [Parameter(Mandatory)]
     [PSCustomObject]$Config,
     [switch]$Force,
     [string]$Email,
-    [string]$BackgroundImage = ""
+    [string]$BackgroundImage = "",
+    [ValidateSet('Speaker', 'Attendee', 'All')]
+    [string]$Type = 'All'
 )
 
 . (Join-Path $PSScriptRoot "Data-Access.ps1")
 
 $dataContext = New-DataContext -Config $Config
-$outputFile = if ($Config.PSObject.Properties['badge'] -and $Config.badge.outputFile) {
+$outputFile = if ($Type -eq 'Speaker') {
+    if ($Config.PSObject.Properties['badge'] -and $Config.badge.speakerOutputFile) {
+        Join-Path $PSScriptRoot ".." $Config.badge.speakerOutputFile
+    } else {
+        Join-Path $PSScriptRoot "..\output\speaker-badges.pdf"
+    }
+} elseif ($Config.PSObject.Properties['badge'] -and $Config.badge.outputFile) {
     Join-Path $PSScriptRoot ".." $Config.badge.outputFile
 } else {
     Join-Path $PSScriptRoot "..\output\badges.pdf"
@@ -166,6 +182,22 @@ body { background: white; }
     height: 1.05in;
     display: block;
 }
+.speaker-banner {
+    position: absolute;
+    top: 0.22in;
+    right: -0.65in;
+    width: 2in;
+    transform: rotate(45deg);
+    background: #cc2200;
+    color: #fff;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    font-size: 13pt;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 0.04in 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
 </style>
 "@
 
@@ -192,10 +224,12 @@ body { background: white; }
             $titleHtml   = if ($a.JobTitle) { "<div class=`"job-title`">$([System.Web.HttpUtility]::HtmlEncode($a.JobTitle))</div>" } else { "" }
             $companyHtml = if ($a.Company)  { "<div class=`"company`">$([System.Web.HttpUtility]::HtmlEncode($a.Company))</div>" }  else { "" }
             $lunchHtml   = if ($a.LunchType) { "<div class=`"lunch-type`">$([System.Web.HttpUtility]::HtmlEncode($a.LunchType))</div>" } else { "" }
+            $bannerHtml  = if ($a.TicketType -like '*Speaker*') { "<div class=`"speaker-banner`">SPEAKER</div>" } else { "" }
 
             $cards += @"
 <div class="badge">
   <img class="badge-bg" src="$BgDataUri"/>
+  $bannerHtml
   <div class="badge-body">
     <div class="info-col">
       <div class="first-name">$([System.Web.HttpUtility]::HtmlEncode($a.FirstName))</div>
@@ -243,14 +277,15 @@ window.addEventListener('DOMContentLoaded', function() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 # Query attendees
-$attendees = Get-AttendeesForNameTag -DataContext $dataContext -Email $Email -Force:$Force
+$attendees = Get-AttendeesForNameTag -DataContext $dataContext -Email $Email -Force:$Force -Type $Type
 
 if ($attendees.Count -eq 0) {
     Write-Host "No attendees need badge generation. Use -Force to regenerate all." -ForegroundColor Yellow
     return
 }
 
-Write-Host "Generating badges for $($attendees.Count) attendee(s)..." -ForegroundColor Cyan
+$typeLabel = switch ($Type) { 'Speaker' { 'speaker badges' }; 'Attendee' { 'attendee badges' }; default { 'badges' } }
+Write-Host "Generating $typeLabel for $($attendees.Count) attendee(s)..." -ForegroundColor Cyan
 
 $bgDataUri = "data:$bgMime;base64,$bgB64"
 $html      = New-BadgeHtml -Attendees $attendees -BgDataUri $bgDataUri
