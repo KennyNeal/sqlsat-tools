@@ -39,6 +39,8 @@ try {
     }
     $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
 
+    Import-Module PSSQLite -ErrorAction Stop
+
     $scriptsDir = $PSScriptRoot
     $repoRoot   = Join-Path $scriptsDir ".."
     $dbPath     = Join-Path $repoRoot $config.database.path
@@ -55,7 +57,6 @@ try {
     Add-Type -Path $libPath
 
     . (Join-Path $scriptsDir "Badge-Helpers.ps1")
-    . (Join-Path $scriptsDir "Data-Access.ps1")
     . (Join-Path $scriptsDir "Checkin-Core.ps1")
 
     $dataContext = New-DataContext -Config $config
@@ -80,7 +81,7 @@ try {
     Write-Host "  Something's wrong before check-in can start:" -ForegroundColor Red
     Write-Host "  $($_.Exception.Message)" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  Ask a grown-up for help. Press Enter to close." -ForegroundColor Yellow
+    Write-Host "  Press Enter to close." -ForegroundColor Yellow
     Read-Host | Out-Null
     return
 }
@@ -98,7 +99,7 @@ function New-WalkinInteractive {
     param([switch]$PracticeMode)
 
     Write-Host ""
-    Write-Host "  No match found. Let's add them as a walk-in:" -ForegroundColor Yellow
+    Write-Host "  No match found. Add them as a walk-in:" -ForegroundColor Yellow
     $firstName = Read-RequiredText "  First name"
     $lastName  = Read-RequiredText "  Last name"
     $walkinEmail = Read-RequiredText "  Email"
