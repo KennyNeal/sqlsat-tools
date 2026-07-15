@@ -26,12 +26,12 @@ try {
 $headers  = @{ Authorization = "Bearer $token" }
 $eventId  = $Config.eventbrite.eventId
 $url      = "https://www.eventbriteapi.com/v3/events/$eventId/attendees/"
-# Must include cancelled/refunded statuses too, not just "attending" — otherwise
-# an attendee who gets cancelled after their first import is never fetched again,
-# so their local AttendeeStatus stays stuck at "attending" and they keep passing
-# the "NOT IN ('Cancelled', 'Deleted')" filters used for badges/speedpasses/checkin.
-$statusQs = "status=attending,not_attending,cancelled,declined,refunded"
-$query    = "?$statusQs&expand=answers"
+# No status filter — fetch every attendee regardless of status. A status=attending
+# filter here means an attendee who gets cancelled after their first import is never
+# fetched again, so their local AttendeeStatus stays stuck at "attending" forever
+# and they keep passing the exclusion filters used for badges/speedpasses/checkin.
+# (Eventbrite's status query param only accepts one value at a time, not a list.)
+$query = "?expand=answers"
 
 function Get-Answer($answers, $keyword) {
     ($answers | Where-Object { $_.question -like "*$keyword*" } | Select-Object -First 1).answer
@@ -43,7 +43,7 @@ $all = @()
 do {
     $resp    = Invoke-RestMethod -Method Get -Uri ($url + $query) -Headers $headers
     $all    += $resp.attendees
-    $query   = if ($resp.pagination.has_more_items) { "?$statusQs&continuation=$($resp.pagination.continuation)" } else { $null }
+    $query   = if ($resp.pagination.has_more_items) { "?continuation=$($resp.pagination.continuation)" } else { $null }
 } while ($query)
 
 Write-Host "  Fetched $($all.Count) attendees" -ForegroundColor Green
