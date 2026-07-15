@@ -95,7 +95,7 @@ function Send-ToPrinter {
         throw "SumatraPDF not found. Install it with: winget install --id SumatraPDF.SumatraPDF -e"
     }
 
-    if (-not (Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Printer -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $PrinterName })) {
         throw "Printer '$PrinterName' not found on this system (SumatraPDF silently no-ops on an unknown printer name instead of erroring, so this is checked up front)."
     }
 
@@ -106,7 +106,7 @@ function Send-ToPrinter {
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName  = $sumatra
-    $psi.Arguments = "-print-to `"$PrinterName`" -print-settings `"noscale`" -silent -exit-when-done `"$PdfPath`""
+    $psi.Arguments = "-print-to `"$PrinterName`" -print-settings `"noscale,simplex`" -silent -exit-when-done `"$PdfPath`""
     $psi.UseShellExecute = $false
     $proc = [System.Diagnostics.Process]::Start($psi)
     if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
