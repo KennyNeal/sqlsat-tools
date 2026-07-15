@@ -26,7 +26,8 @@ try {
 $headers  = @{ Authorization = "Bearer $token" }
 $eventId  = $Config.eventbrite.eventId
 $url      = "https://www.eventbriteapi.com/v3/events/$eventId/attendees/"
-$query    = "?status=attending&expand=answers"
+$statusQs = "status=attending"
+$query    = "?$statusQs&expand=answers"
 
 function Get-Answer($answers, $keyword) {
     ($answers | Where-Object { $_.question -like "*$keyword*" } | Select-Object -First 1).answer
@@ -38,14 +39,14 @@ $all = @()
 do {
     $resp    = Invoke-RestMethod -Method Get -Uri ($url + $query) -Headers $headers
     $all    += $resp.attendees
-    $query   = if ($resp.pagination.has_more_items) { "?continuation=$($resp.pagination.continuation)" } else { $null }
+    $query   = if ($resp.pagination.has_more_items) { "?$statusQs&continuation=$($resp.pagination.continuation)" } else { $null }
 } while ($query)
 
 Write-Host "  Fetched $($all.Count) attendees" -ForegroundColor Green
 
 $rows = [System.Collections.Generic.List[hashtable]]::new()
 foreach ($a in $all) {
-    $profile = $a.profile
+    $attendeeProfile = $a.profile
     $barcode = ($a.barcodes | Select-Object -First 1).barcode
     if (-not $barcode) { continue }
 
@@ -55,17 +56,17 @@ foreach ($a in $all) {
         Barcode        = $barcode
         OrderId        = $a.order_id
         OrderDate      = $a.created
-        FirstName      = $profile.first_name
-        LastName       = $profile.last_name
-        Email          = $profile.email
-        Company        = $profile.company
-        JobTitle       = $profile.job_title
+        FirstName      = $attendeeProfile.first_name
+        LastName       = $attendeeProfile.last_name
+        Email          = $attendeeProfile.email
+        Company        = $attendeeProfile.company
+        JobTitle       = $attendeeProfile.job_title
         LunchType      = Get-Answer $answers "Lunch"
         TicketType     = $a.ticket_class_name
         AttendeeStatus = $a.status
         IsVolunteer    = if ((Get-Answer $answers "volunteer") -eq "Yes") { 1 } else { 0 }
         TwitterHandle  = Get-Answer $answers "Twitter"
-        Website        = $profile.website
+        Website        = $attendeeProfile.website
     })
 }
 
