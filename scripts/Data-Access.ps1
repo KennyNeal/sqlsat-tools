@@ -358,7 +358,8 @@ function Get-AttendeesByOrderOrEmail {
 SELECT a.Barcode, a.OrderId, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType, p.PrintedAt
 FROM   Attendees a
 LEFT JOIN PrintedBadges p ON p.Barcode = a.Barcode
-WHERE  $(if ($OrderId) { "a.OrderId = @OrderId" } else { "a.Email = @Email" })
+WHERE  a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')
+AND    $(if ($OrderId) { "a.OrderId = @OrderId" } else { "a.Email = @Email" })
 ORDER  BY a.LastName, a.FirstName
 "@
     $params = if ($OrderId) { @{ OrderId = $OrderId } } else { @{ Email = $Email } }
@@ -486,10 +487,11 @@ VALUES
 function Get-AttendeesForSpeedPass {
     param([Parameter(Mandatory)]$DataContext, [string]$Email, [switch]$Force)
 
-    $emailFilter = if ($Email) { "a.Email = @Email" } else { $null }
-    $nullFilter  = if (-not $Force) { "p.SpeedPassGeneratedAt IS NULL" } else { $null }
-    $conditions  = @($emailFilter, $nullFilter) | Where-Object { $_ }
-    $whereClause = if ($conditions) { "WHERE " + ($conditions -join " AND ") } else { "" }
+    $statusFilter = "a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')"
+    $emailFilter  = if ($Email) { "a.Email = @Email" } else { $null }
+    $nullFilter   = if (-not $Force) { "p.SpeedPassGeneratedAt IS NULL" } else { $null }
+    $conditions   = @($statusFilter, $emailFilter, $nullFilter) | Where-Object { $_ }
+    $whereClause  = "WHERE " + ($conditions -join " AND ")
 
     $query = @"
 SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle,
@@ -541,10 +543,11 @@ UPDATE ProcessedAttendees SET EmailedAt = datetime('now') WHERE Barcode = @Barco
 function Get-AttendeesForNameTag {
     param([Parameter(Mandatory)]$DataContext, [string]$Email, [switch]$Force)
 
-    $emailFilter = if ($Email) { "a.Email = @Email" } else { $null }
-    $nullFilter  = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
-    $conditions  = @($emailFilter, $nullFilter) | Where-Object { $_ }
-    $whereClause = if ($conditions) { "WHERE " + ($conditions -join " AND ") } else { "" }
+    $statusFilter = "a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')"
+    $emailFilter  = if ($Email) { "a.Email = @Email" } else { $null }
+    $nullFilter   = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
+    $conditions   = @($statusFilter, $emailFilter, $nullFilter) | Where-Object { $_ }
+    $whereClause  = "WHERE " + ($conditions -join " AND ")
 
     $query = @"
 SELECT a.Barcode, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType
