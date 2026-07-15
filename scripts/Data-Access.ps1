@@ -358,7 +358,7 @@ function Get-AttendeesByOrderOrEmail {
 SELECT a.Barcode, a.OrderId, a.FirstName, a.LastName, a.Email, a.Company, a.JobTitle, a.LunchType, p.PrintedAt
 FROM   Attendees a
 LEFT JOIN PrintedBadges p ON p.Barcode = a.Barcode
-WHERE  a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')
+WHERE  LOWER(a.AttendeeStatus) NOT IN ('cancelled', 'deleted', 'refunded', 'declined', 'not_attending')
 AND    $(if ($OrderId) { "a.OrderId = @OrderId" } else { "a.Email = @Email" })
 ORDER  BY a.LastName, a.FirstName
 "@
@@ -487,7 +487,7 @@ VALUES
 function Get-AttendeesForSpeedPass {
     param([Parameter(Mandatory)]$DataContext, [string]$Email, [switch]$Force)
 
-    $statusFilter = "a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')"
+    $statusFilter = "LOWER(a.AttendeeStatus) NOT IN ('cancelled', 'deleted', 'refunded', 'declined', 'not_attending')"
     $emailFilter  = if ($Email) { "a.Email = @Email" } else { $null }
     $nullFilter   = if (-not $Force) { "p.SpeedPassGeneratedAt IS NULL" } else { $null }
     $conditions   = @($statusFilter, $emailFilter, $nullFilter) | Where-Object { $_ }
@@ -549,7 +549,7 @@ function Get-AttendeesForNameTag {
         [string]$Type = 'All'
     )
 
-    $statusFilter  = "a.AttendeeStatus NOT IN ('Cancelled', 'Deleted')"
+    $statusFilter  = "LOWER(a.AttendeeStatus) NOT IN ('cancelled', 'deleted', 'refunded', 'declined', 'not_attending')"
     $emailFilter   = if ($Email) { "a.Email = @Email" } else { $null }
     $nullFilter    = if (-not $Force -and -not $Email) { "p.PrintedAt IS NULL" } else { $null }
     $typeFilter    = switch ($Type) {

@@ -26,7 +26,11 @@ try {
 $headers  = @{ Authorization = "Bearer $token" }
 $eventId  = $Config.eventbrite.eventId
 $url      = "https://www.eventbriteapi.com/v3/events/$eventId/attendees/"
-$statusQs = "status=attending"
+# Must include cancelled/refunded statuses too, not just "attending" — otherwise
+# an attendee who gets cancelled after their first import is never fetched again,
+# so their local AttendeeStatus stays stuck at "attending" and they keep passing
+# the "NOT IN ('Cancelled', 'Deleted')" filters used for badges/speedpasses/checkin.
+$statusQs = "status=attending,not_attending,cancelled,declined,refunded"
 $query    = "?$statusQs&expand=answers"
 
 function Get-Answer($answers, $keyword) {
