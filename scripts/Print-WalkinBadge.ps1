@@ -68,9 +68,9 @@ $printerName = if ($Printer) {
 
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
-. (Join-Path $PSScriptRoot "Badge-Helpers.ps1")
-. (Join-Path $PSScriptRoot "Data-Access.ps1")
-. (Join-Path $PSScriptRoot "Checkin-Core.ps1")
+. (Join-Path $PSScriptRoot "internal" "Badge-Helpers.ps1")
+. (Join-Path $PSScriptRoot "internal" "Data-Access.ps1")
+. (Join-Path $PSScriptRoot "internal" "Checkin-Core.ps1")
 
 $dataContext = New-DataContext -Config $Config
 

@@ -27,11 +27,11 @@ param(
     [string]$Email
 )
 
-. "$PSScriptRoot\Resolve-EventConfig.ps1"
+. "$PSScriptRoot\internal\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
-. "$PSScriptRoot\Web-Helpers.ps1"
-. "$PSScriptRoot\Badge-Helpers.ps1"
-. "$PSScriptRoot\Data-Access.ps1"
+. "$PSScriptRoot\internal\Web-Helpers.ps1"
+. "$PSScriptRoot\internal\Badge-Helpers.ps1"
+. "$PSScriptRoot\internal\Data-Access.ps1"
 
 $dataContext = New-DataContext -Config $Config
 $outputDir   = Join-Path $PSScriptRoot ".." $Config.speedpass.outputDir

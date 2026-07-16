@@ -24,9 +24,9 @@ param(
     [PSCustomObject]$Config
 )
 
-. "$PSScriptRoot\Resolve-EventConfig.ps1"
+. "$PSScriptRoot\internal\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
-. "$PSScriptRoot\Badge-Helpers.ps1"
+. "$PSScriptRoot\internal\Badge-Helpers.ps1"
 
 $sessionizeId = $Config.sessionize.eventId
 $outputFile   = Join-Path $PSScriptRoot ".." $Config.schedule.outputFile
@@ -146,7 +146,7 @@ $dateStr   = $mainDay.ToString("MMMM d, yyyy")
 $genStr    = (Get-Date).ToString("MMMM d, yyyy")
 $appUrl    = $Config.schedule.appUrl
 
-. "$PSScriptRoot\Get-EventLogo.ps1"
+. "$PSScriptRoot\internal\Get-EventLogo.ps1"
 $eventLogo = Get-EventLogo -Config $Config -Override $Config.schedule.logoFile
 
 Add-Type -AssemblyName System.Web

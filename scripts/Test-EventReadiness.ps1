@@ -23,10 +23,10 @@ param(
     [string]$ConfigPath = (Join-Path $PSScriptRoot "..\event.config.json")
 )
 
-. "$PSScriptRoot\Web-Helpers.ps1"
-. "$PSScriptRoot\Badge-Helpers.ps1"
-. "$PSScriptRoot\Get-EventLogo.ps1"
-. "$PSScriptRoot\Data-Access.ps1"
+. "$PSScriptRoot\internal\Web-Helpers.ps1"
+. "$PSScriptRoot\internal\Badge-Helpers.ps1"
+. "$PSScriptRoot\internal\Get-EventLogo.ps1"
+. "$PSScriptRoot\internal\Data-Access.ps1"
 
 $script:results = [System.Collections.Generic.List[object]]::new()
 
@@ -84,7 +84,7 @@ Test-Check "Required config keys" {
         'email.secretName', 'email.subject', 'email.batchSize', 'email.delaySeconds',
         'database.path',
         'speedpass.raffleTiers', 'speedpass.outputDir',
-        'stampGame.tiers', 'stampGame.gridColumns', 'stampGame.outputFile',
+        'sponsors.tableTiers', 'stampGame.gridColumns', 'stampGame.outputFile',
         'schedule.outputFile', 'schedule.appUrl',
         'sessionize.eventId'
     )
@@ -114,7 +114,7 @@ Test-Check "Microsoft Edge" { Get-EdgePath }
 Test-Check "QRCoder.dll loads" { Import-QRCoder; "loaded" }
 
 Test-Check "PSSQLite module" -WarnOnly {
-    if (-not (Get-Module -ListAvailable -Name PSSQLite)) { throw "not installed — Initialize-Database.ps1 installs it on first run" }
+    if (-not (Get-Module -ListAvailable -Name PSSQLite)) { throw "not installed — scripts\setup\Initialize-Database.ps1 installs it on first run" }
     "installed"
 }
 
@@ -249,11 +249,11 @@ Write-Host "`nDatabase" -ForegroundColor Cyan
 
 Test-Check "event.db initialized" -WarnOnly {
     $dbPath = Join-Path $PSScriptRoot ".." $config.database.path
-    if (-not (Test-Path $dbPath)) { throw "not found at $dbPath — run Initialize-Database.ps1" }
+    if (-not (Test-Path $dbPath)) { throw "not found at $dbPath — run scripts\setup\Initialize-Database.ps1" }
     Import-Module PSSQLite -ErrorAction Stop
     $tables = (Invoke-SqliteQuery -DataSource $dbPath -Query "SELECT name FROM sqlite_master WHERE type='table'").name
     $missing = @('Attendees', 'ProcessedAttendees', 'PrintedBadges' | Where-Object { $_ -notin $tables })
-    if ($missing) { throw "missing table(s): $($missing -join ', ') — run Initialize-Database.ps1" }
+    if ($missing) { throw "missing table(s): $($missing -join ', ') — run scripts\setup\Initialize-Database.ps1" }
     $count = (Invoke-SqliteQuery -DataSource $dbPath -Query "SELECT COUNT(*) AS c FROM Attendees").c
     "$count attendees"
 }

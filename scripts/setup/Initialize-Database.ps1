@@ -5,14 +5,14 @@
     Run once per event to initialize the database. Safe to re-run — uses
     CREATE TABLE IF NOT EXISTS so existing data is preserved.
 .EXAMPLE
-    .\Initialize-Database.ps1 -Config (Get-Content .\event.config.json | ConvertFrom-Json)
+    .\scripts\setup\Initialize-Database.ps1 -Config (Get-Content .\event.config.json | ConvertFrom-Json)
 #>
 param(
     [Parameter(Mandatory)]
     [PSCustomObject]$Config
 )
 
-$dbPath = Join-Path $PSScriptRoot ".." $Config.database.path
+$dbPath = Join-Path $PSScriptRoot ".." ".." $Config.database.path
 
 if (-not (Get-Module -ListAvailable -Name PSSQLite)) {
     Write-Host "Installing PSSQLite module..." -ForegroundColor Cyan

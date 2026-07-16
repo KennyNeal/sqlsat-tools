@@ -10,7 +10,7 @@
     working offline with data as fresh as the last successful run.
 #>
 
-$script:WebCacheDir = Join-Path $PSScriptRoot "..\cache"
+$script:WebCacheDir = Join-Path $PSScriptRoot "..\..\cache"
 
 function Get-WebCachePath {
     param([Parameter(Mandatory)][string]$Url)
