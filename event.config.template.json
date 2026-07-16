@@ -29,6 +29,11 @@
     "gridColumns": 3,
     "outputFile": "./output/stamp-game.pdf"
   },
+  "boothSigns": {
+    "tiers": ["platinum", "gold", "silver"],
+    "excludeSponsors": [],
+    "outputFile": "./output/booth-signs.pdf"
+  },
   "schedule": {
     "outputFile": "./output/schedule.html",
     "appUrl": "https://sqlsatbr26.sessionize.com/"

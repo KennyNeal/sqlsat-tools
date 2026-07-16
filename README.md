@@ -73,6 +73,9 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `stampGame.tiers` | Sponsor tiers that appear on the stamp game card |
 | `stampGame.excludeSponsors` | Sponsor names to skip even if they match a listed tier |
 | `stampGame.gridColumns` | Number of columns in the stamp card grid (overridden automatically when logo count is a perfect square) |
+| `boothSigns.tiers` | Sponsor tiers that get a booth sign |
+| `boothSigns.excludeSponsors` | Sponsor names to skip even if they match a listed tier |
+| `boothSigns.outputFile` | Where the generated booth signs PDF is written |
 | `slideTemplate.footerText` | Text shown in the bottom bar of the title and sponsor slides (e.g. a room policy reminder) |
 | `slideTemplate.primaryColor` / `slideTemplate.secondaryColor` | Hex brand colors for the header/footer bars and slide text (shared with the raffle deck) |
 | `slideTemplate.outputFile` | Where the generated `.potx` is written |
@@ -210,6 +213,11 @@ $config = Get-Content .\event.config.json | ConvertFrom-Json
 # Stamp game card (run once when sponsors are finalized)
 .\scripts\Generate-StampGame.ps1 -Config $config
 
+# Booth signs — one full-page sign per vendor (logo, tier, name) to print
+# and set out at each sponsor's table. Same sponsor set as the stamp game.
+# (run once sponsors are finalized; re-run any time the sponsor roster changes)
+.\scripts\Generate-BoothSigns.ps1 -Config $config
+
 # Paper schedule (run once sessions are published on Sessionize)
 .\scripts\Generate-Schedule.ps1 -Config $config
 
@@ -296,6 +304,7 @@ sqlsat-tools/
 │   ├── Generate-SpeedPasses.ps1
 │   ├── Send-SpeedPasses.ps1
 │   ├── Generate-StampGame.ps1
+│   ├── Generate-BoothSigns.ps1
 │   ├── Generate-Schedule.ps1
 │   ├── Generate-SlideTemplate.ps1
 │   ├── generate_slide_template.py
