@@ -33,7 +33,7 @@ Set-Secret -Name 'AzureSqlAuth' -Secret (terraform output -raw sql_admin_passwor
 
 Then fill in `event.config.json`'s `azure` section with `terraform output
 sql_server_fqdn` / `sql_database_name` / `sql_admin_username`, set `enabled:
-true`, and run `.\scripts\Initialize-AzureDatabase.ps1` from the repo root.
+true`, and run `.\scripts\setup\Initialize-AzureDatabase.ps1` from the repo root.
 
 ## Firewall / venue network
 

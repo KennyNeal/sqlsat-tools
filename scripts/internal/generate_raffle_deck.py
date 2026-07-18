@@ -423,7 +423,13 @@ def main():
 
     out_path = Path(manifest["outputPath"])
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    prs.save(str(out_path))
+    try:
+        prs.save(str(out_path))
+    except PermissionError:
+        sys.exit(
+            f"Can't write {out_path} -- it's probably open in PowerPoint. "
+            "Close it and run this again."
+        )
     set_show_setup(out_path, shows, sections)
 
     print(f"Raffle deck: {out_path}")

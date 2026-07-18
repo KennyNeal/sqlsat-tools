@@ -17,7 +17,7 @@ param(
     [PSCustomObject]$Config
 )
 
-. (Join-Path $PSScriptRoot "Data-Access.ps1")
+. (Join-Path $PSScriptRoot "internal" "Data-Access.ps1")
 $dataContext = New-DataContext -Config $Config
 
 $walkins = Get-UnsyncedWalkins -DataContext $dataContext

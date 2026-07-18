@@ -17,7 +17,7 @@ function Get-EdgePath {
 }
 
 function Import-QRCoder {
-    $libPath = Join-Path $PSScriptRoot "..\lib\QRCoder.dll"
+    $libPath = Join-Path $PSScriptRoot "..\..\lib\QRCoder.dll"
     if (-not (Test-Path $libPath)) { throw "QRCoder.dll not found at $libPath." }
     Add-Type -Path $libPath
 }

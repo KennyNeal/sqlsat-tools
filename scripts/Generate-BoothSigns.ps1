@@ -16,54 +16,30 @@ param(
     [PSCustomObject]$Config
 )
 
-if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
-    Install-Module -Name powershell-yaml -Scope CurrentUser -Force
-}
-Import-Module powershell-yaml
-
-. "$PSScriptRoot\Resolve-EventConfig.ps1"
+. "$PSScriptRoot\internal\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
+. "$PSScriptRoot\internal\Web-Helpers.ps1"
+. "$PSScriptRoot\internal\Badge-Helpers.ps1"
 
 $outputFile = Join-Path $PSScriptRoot ".." $Config.boothSigns.outputFile
 $outputDir  = Split-Path $outputFile
 if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
 
-$edgePaths = @(
-    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
-    "${env:ProgramFiles}\Microsoft\Edge\Application\msedge.exe"
-)
-
 # ── Fetch sponsor logos ───────────────────────────────────────────────────────
 
-$repo    = $Config.websiteRepo
-$rawBase = "https://raw.githubusercontent.com/$($repo.owner)/$($repo.name)/$($repo.branch)"
-$yamlUrl = "$rawBase/content/events/$($repo.eventKey)/sponsors.yaml"
-
-Write-Host "Fetching sponsor data..." -ForegroundColor Cyan
-$yaml = (Invoke-RestMethod -Uri $yamlUrl -Method Get)
-$data = ConvertFrom-Yaml $yaml
+$rawBase = Get-RawBase $Config
 
 $sponsors = [System.Collections.Generic.List[hashtable]]::new()
-foreach ($group in $data.groups) {
-    if ($group.tier -notin $Config.boothSigns.tiers) { continue }
+foreach ($group in (Get-SponsorGroups -Config $Config)) {
+    if ($group.tier -notin $Config.sponsors.tableTiers) { continue }
     foreach ($sponsor in $group.sponsors) {
-        if ($sponsor.name -in $Config.boothSigns.excludeSponsors) {
+        if ($sponsor.name -in $Config.sponsors.tableExcludeSponsors) {
             Write-Host "  Skipping (excluded): $($sponsor.name)" -ForegroundColor DarkGray
             continue
         }
-        $logoUrl = "$rawBase/static/$($sponsor.logo)"
         try {
-            $raw      = (Invoke-WebRequest -Uri $logoUrl -UseBasicParsing).Content
-            $bytes    = if ($raw -is [string]) { [System.Text.Encoding]::UTF8.GetBytes($raw) } else { $raw }
-            $b64      = [Convert]::ToBase64String($bytes)
-            $ext      = [System.IO.Path]::GetExtension($sponsor.logo).TrimStart('.')
-            $mimeType = switch ($ext) {
-                'svg'  { 'image/svg+xml' }
-                'jpg'  { 'image/jpeg' }
-                'jpeg' { 'image/jpeg' }
-                default { "image/$ext" }
-            }
-            $sponsors.Add(@{ Name = $sponsor.name; Base64 = $b64; Mime = $mimeType; Tier = $group.tier })
+            $img = Get-WebImage -Url "$rawBase/static/$($sponsor.logo)"
+            $sponsors.Add(@{ Name = $sponsor.name; Base64 = $img.Base64; Mime = $img.Mime; Tier = $group.tier })
             Write-Host "  $($sponsor.name)" -ForegroundColor DarkGray
         } catch {
             Write-Host "  Warning: could not load logo for $($sponsor.name)" -ForegroundColor Yellow
@@ -146,11 +122,7 @@ $($signList -join "`n")
 $htmlPath = [System.IO.Path]::ChangeExtension($outputFile, ".html")
 Set-Content -Path $htmlPath -Value $html -Encoding UTF8
 
-$edge = $edgePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $edge) { throw "Microsoft Edge not found." }
-
-$null = & $edge --headless=new --print-to-pdf="$outputFile" --no-margins "file:///$htmlPath" --disable-gpu --disable-extensions --no-pdf-header-footer 2>&1
-Start-Sleep -Seconds 4
+ConvertTo-PdfViaEdge -HtmlPath $htmlPath -PdfPath $outputFile
 Remove-Item $htmlPath -ErrorAction SilentlyContinue
 
 Write-Host "Booth signs PDF: $outputFile ($($sponsors.Count) sponsors)" -ForegroundColor Green

@@ -36,7 +36,7 @@ param(
     [string]$Type = 'All'
 )
 
-. (Join-Path $PSScriptRoot "Data-Access.ps1")
+. (Join-Path $PSScriptRoot "internal" "Data-Access.ps1")
 
 $dataContext = New-DataContext -Config $Config
 $outputFile = if ($Type -eq 'Speaker') {
@@ -78,7 +78,7 @@ $bgMime  = switch ($bgExt) {
 }
 Write-Host "  Loaded badge background: $bgImagePath" -ForegroundColor DarkGray
 
-. (Join-Path $PSScriptRoot "Badge-Helpers.ps1")
+. (Join-Path $PSScriptRoot "internal" "Badge-Helpers.ps1")
 Import-QRCoder
 
 # ── Badge HTML builder ────────────────────────────────────────────────────────
