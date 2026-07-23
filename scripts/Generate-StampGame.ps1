@@ -18,10 +18,10 @@ param(
     [int]$GridColumns = 0
 )
 
-. "$PSScriptRoot\Resolve-EventConfig.ps1"
+. "$PSScriptRoot\internal\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
-. "$PSScriptRoot\Web-Helpers.ps1"
-. "$PSScriptRoot\Badge-Helpers.ps1"
+. "$PSScriptRoot\internal\Web-Helpers.ps1"
+. "$PSScriptRoot\internal\Badge-Helpers.ps1"
 
 $cols       = if ($GridColumns -gt 0) { $GridColumns } else { $Config.stampGame.gridColumns }
 $outputFile = Join-Path $PSScriptRoot ".." $Config.stampGame.outputFile
@@ -34,9 +34,9 @@ $rawBase = Get-RawBase $Config
 
 $logos = [System.Collections.Generic.List[hashtable]]::new()
 foreach ($group in (Get-SponsorGroups -Config $Config)) {
-    if ($group.tier -notin $Config.stampGame.tiers) { continue }
+    if ($group.tier -notin $Config.sponsors.tableTiers) { continue }
     foreach ($sponsor in $group.sponsors) {
-        if ($sponsor.name -in $Config.stampGame.excludeSponsors) {
+        if ($sponsor.name -in $Config.sponsors.tableExcludeSponsors) {
             Write-Host "  Skipping (excluded): $($sponsor.name)" -ForegroundColor DarkGray
             continue
         }
@@ -52,7 +52,7 @@ foreach ($group in (Get-SponsorGroups -Config $Config)) {
 
 # ── Resolve free-space logo ───────────────────────────────────────────────────
 
-. "$PSScriptRoot\Get-EventLogo.ps1"
+. "$PSScriptRoot\internal\Get-EventLogo.ps1"
 $eventLogo = Get-EventLogo -Config $Config -Override $Config.stampGame.freeSpaceLogoFile
 
 # ── Build HTML ────────────────────────────────────────────────────────────────

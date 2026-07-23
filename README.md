@@ -10,7 +10,7 @@ the sponsor stamp game card — all driven by a single config file.
 1. Copy event.config.template.json → event.config.json
 2. Fill in your credentials and event IDs (see Config reference below)
 3. Run: .\scripts\Test-EventReadiness.ps1   (preflight — checks config, secrets, data sources, tools)
-4. Run: .\scripts\Initialize-Database.ps1 -Config (Get-Content event.config.json | ConvertFrom-Json)
+4. Run: .\scripts\setup\Initialize-Database.ps1 -Config (Get-Content event.config.json | ConvertFrom-Json)
 5. Run: .\Update-Event.ps1
 ```
 
@@ -70,9 +70,10 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 | `email.subject` | Email subject line |
 | `email.fromName` | Display name in the From header |
 | `speedpass.raffleTiers` | Sponsor tiers that get a raffle slip (e.g., `["global","platinum","gold","silver"]`) |
-| `stampGame.tiers` | Sponsor tiers that appear on the stamp game card |
-| `stampGame.excludeSponsors` | Sponsor names to skip even if they match a listed tier |
+| `sponsors.tableTiers` | Sponsor tiers with a physical table — shared by the stamp game and booth signs, since they cover the same sponsor set |
+| `sponsors.tableExcludeSponsors` | Sponsor names to skip even if they match a listed table tier — shared by the stamp game and booth signs |
 | `stampGame.gridColumns` | Number of columns in the stamp card grid (overridden automatically when logo count is a perfect square) |
+| `boothSigns.outputFile` | Where the generated booth signs PDF is written |
 | `slideTemplate.footerText` | Text shown in the bottom bar of the title and sponsor slides (e.g. a room policy reminder) |
 | `slideTemplate.primaryColor` / `slideTemplate.secondaryColor` | Hex brand colors for the header/footer bars and slide text (shared with the raffle deck) |
 | `slideTemplate.outputFile` | Where the generated `.potx` is written |
@@ -123,47 +124,7 @@ Set-Secret -Name "SQLSaturday-Gmail" -Secret (Get-Credential)
 
 **Setting up a second laptop:** clone/copy this repo onto it, copy
 `event.config.json`, `event.db`, and `lib\QRCoder.dll` over from the primary
-laptop, then run `.\scripts\Setup-CheckinLaptop.ps1` — it installs
-SumatraPDF/Edge/PSSQLite if missing, configures the secret vault with no
-master password, and sanity-checks the printer. Each laptop runs an
-**independent copy** of `event.db` (no live sync between desks yet — see
-open issues), so re-copy `event.db` from the primary laptop right before the
-event to pick up the latest registrations.
-
-Whoever's running the registration desk doesn't need to touch PowerShell
-directly — double-click **`Start-Checkin.bat`** in the repo root. It opens a
-menu-driven console app (`scripts/Checkin-Menu.ps1`):
-
-```
-============================
-   SQL Saturday Check-In
-============================
-[1] Check in an attendee
-[2] Practice mode (no printing)
-[3] Sync new registrations from Eventbrite
-[4] Show walk-ins not yet in Eventbrite
-[Q] Quit
-```
-
-- **Option 1** is the desk loop: type/scan an order # or email, it prints the
-  badge label and asks for the next one. Unknown lookups prompt a quick-add
-  walk-in form. Leave the lookup blank to return to the menu.
-- **Option 2** is the same flow but only opens a preview of the label — no
-  printing, no database changes — good for a dry run before doors open.
-- **Option 3** re-runs `Import-Attendees.ps1` (needs the Eventbrite
-  credential already set up — see Credential setup above). Runs immediately,
-  no confirmation prompt, and retries up to 3 times on a flaky connection.
-- **Option 4** shows the same report as `List-UnsyncedWalkins.ps1` below.
-
-The menu is a thin wrapper around the same scripts and database described in
-this section — `scripts/Checkin-Core.ps1` holds the shared lookup/print
-logic so both the menu and the raw CLI script below stay in sync.
-
-### Check-in day (for helpers)
-
-**Setting up a second laptop:** clone/copy this repo onto it, copy
-`event.config.json`, `event.db`, and `lib\QRCoder.dll` over from the primary
-laptop, then run `.\scripts\Setup-CheckinLaptop.ps1` — it installs
+laptop, then run `.\scripts\setup\Setup-CheckinLaptop.ps1` — it installs
 SumatraPDF/Edge/PSSQLite if missing, configures the secret vault with no
 master password, and sanity-checks the printer. Each laptop runs an
 **independent copy** of `event.db` (no live sync between desks yet — see
@@ -209,6 +170,11 @@ $config = Get-Content .\event.config.json | ConvertFrom-Json
 
 # Stamp game card (run once when sponsors are finalized)
 .\scripts\Generate-StampGame.ps1 -Config $config
+
+# Booth signs — one full-page sign per vendor (logo, tier, name) to print
+# and set out at each sponsor's table. Same sponsor set as the stamp game.
+# (run once sponsors are finalized; re-run any time the sponsor roster changes)
+.\scripts\Generate-BoothSigns.ps1 -Config $config
 
 # Paper schedule (run once sessions are published on Sessionize)
 .\scripts\Generate-Schedule.ps1 -Config $config
@@ -289,29 +255,35 @@ sqlsat-tools/
 ├── event.config.template.json    ← copy → event.config.json
 ├── event.config.json             ← gitignored; your live config
 ├── event.db                      ← gitignored; SQLite database
-├── scripts/
+├── scripts/                      ← run these directly (or via Update-Event.ps1 / the check-in menu)
 │   ├── Test-EventReadiness.ps1   ← preflight check; run before event runs
-│   ├── Initialize-Database.ps1
 │   ├── Import-Attendees.ps1
 │   ├── Generate-SpeedPasses.ps1
 │   ├── Send-SpeedPasses.ps1
 │   ├── Generate-StampGame.ps1
+│   ├── Generate-BoothSigns.ps1
 │   ├── Generate-Schedule.ps1
 │   ├── Generate-SlideTemplate.ps1
-│   ├── generate_slide_template.py
 │   ├── Generate-RaffleDeck.ps1
-│   ├── generate_raffle_deck.py
-│   ├── slide_helpers.py          ← shared by both slide-deck builders (Python side)
-│   ├── Slide-Common.ps1          ← shared by both slide-deck builders (PowerShell side)
 │   ├── Generate-NameTag.ps1      ← bulk Avery badge sheets
 │   ├── Checkin-Menu.ps1          ← check-in day TUI, launched by Start-Checkin.bat
-│   ├── Checkin-Core.ps1          ← shared lookup/print logic (Checkin-Menu.ps1 + Print-WalkinBadge.ps1)
 │   ├── Print-WalkinBadge.ps1     ← day-of/walk-in single-label printing (Brother QL-820NWB)
 │   ├── List-UnsyncedWalkins.ps1  ← walk-ins not yet registered in Eventbrite
-│   ├── Badge-Helpers.ps1         ← shared vCard/QR/Edge-PDF/print helpers
-│   ├── Web-Helpers.ps1           ← shared website-repo fetch helpers (images, sponsors.yaml)
-│   ├── Resolve-EventConfig.ps1   ← merges event name from the website repo into config
-│   └── Get-EventLogo.ps1         ← fetches the event logo from the website repo
+│   ├── setup/                    ← one-time / per-event setup scripts
+│   │   ├── Initialize-Database.ps1
+│   │   ├── Initialize-AzureDatabase.ps1  ← optional: provision the shared Azure SQL tables (see infra/README.md)
+│   │   └── Setup-CheckinLaptop.ps1       ← one-time setup for a second check-in laptop
+│   └── internal/                 ← helper libraries, not meant to be run directly
+│       ├── Badge-Helpers.ps1         ← shared vCard/QR/Edge-PDF/print helpers
+│       ├── Web-Helpers.ps1           ← shared website-repo fetch helpers (images, sponsors.yaml)
+│       ├── Resolve-EventConfig.ps1   ← merges event name from the website repo into config
+│       ├── Get-EventLogo.ps1         ← fetches the event logo from the website repo
+│       ├── Data-Access.ps1           ← shared SQLite/Azure attendee data access
+│       ├── Checkin-Core.ps1          ← shared lookup/print logic (Checkin-Menu.ps1 + Print-WalkinBadge.ps1)
+│       ├── Slide-Common.ps1          ← shared by both slide-deck builders (PowerShell side)
+│       ├── slide_helpers.py          ← shared by both slide-deck builders (Python side)
+│       ├── generate_slide_template.py
+│       └── generate_raffle_deck.py
 ├── templates/
 │   └── attendee-email.html
 ├── assets/

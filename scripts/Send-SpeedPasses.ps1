@@ -26,7 +26,7 @@ param(
     [switch]$ShowBanner
 )
 
-. (Join-Path $PSScriptRoot "Data-Access.ps1")
+. (Join-Path $PSScriptRoot "internal" "Data-Access.ps1")
 
 $dataContext     = New-DataContext -Config $Config
 $templateFolder  = Join-Path $PSScriptRoot "..\templates"

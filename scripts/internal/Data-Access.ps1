@@ -101,7 +101,7 @@ function New-DataContext {
     #>
     param([Parameter(Mandatory)][PSCustomObject]$Config)
 
-    $localDbPath = Join-Path $PSScriptRoot ".." $Config.database.path
+    $localDbPath = Join-Path $PSScriptRoot ".." ".." $Config.database.path
 
     $azureEnabled = $false
     $azureConnStr = $null
@@ -742,10 +742,10 @@ function Test-DatabaseReadiness {
     #>
     param([Parameter(Mandatory)]$DataContext)
 
-    if (-not (Test-Path $DataContext.LocalDbPath)) { throw "local db not found at $($DataContext.LocalDbPath) — run Initialize-Database.ps1" }
+    if (-not (Test-Path $DataContext.LocalDbPath)) { throw "local db not found at $($DataContext.LocalDbPath) — run scripts\setup\Initialize-Database.ps1" }
     $tables = (Invoke-SqliteQuery -DataSource $DataContext.LocalDbPath -Query "SELECT name FROM sqlite_master WHERE type='table'").name
     $missing = @('Attendees', 'ProcessedAttendees', 'PrintedBadges', 'PendingWrites' | Where-Object { $_ -notin $tables })
-    if ($missing) { throw "local db missing table(s): $($missing -join ', ') — run Initialize-Database.ps1" }
+    if ($missing) { throw "local db missing table(s): $($missing -join ', ') — run scripts\setup\Initialize-Database.ps1" }
     $count = (Invoke-SqliteQuery -DataSource $DataContext.LocalDbPath -Query "SELECT COUNT(*) AS c FROM Attendees").c
 
     if (-not $DataContext.AzureEnabled) {
@@ -757,7 +757,7 @@ function Test-DatabaseReadiness {
     }
     $azureTables = (Invoke-AzureQuery -DataContext $DataContext -CommandText "SELECT name FROM sys.tables").name
     $azureMissing = @('Attendees', 'ProcessedAttendees', 'PrintedBadges' | Where-Object { $_ -notin $azureTables })
-    if ($azureMissing) { throw "Azure SQL missing table(s): $($azureMissing -join ', ') — run Initialize-AzureDatabase.ps1" }
+    if ($azureMissing) { throw "Azure SQL missing table(s): $($azureMissing -join ', ') — run scripts\setup\Initialize-AzureDatabase.ps1" }
 
     "$count local attendees, Azure reachable"
 }

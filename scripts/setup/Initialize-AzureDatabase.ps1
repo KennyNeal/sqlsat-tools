@@ -11,7 +11,7 @@
     the SQL authentication password, set via:
         Set-Secret -Name '<azure.authSecretName>' -Secret '<password>'
 .EXAMPLE
-    .\Initialize-AzureDatabase.ps1 -Config (Get-Content .\event.config.json | ConvertFrom-Json)
+    .\scripts\setup\Initialize-AzureDatabase.ps1 -Config (Get-Content .\event.config.json | ConvertFrom-Json)
 #>
 param(
     [Parameter(Mandatory)]

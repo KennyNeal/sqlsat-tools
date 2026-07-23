@@ -194,7 +194,13 @@ def main():
 
     out_path = Path(manifest["outputPath"])
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    prs.save(str(out_path))
+    try:
+        prs.save(str(out_path))
+    except PermissionError:
+        sys.exit(
+            f"Can't write {out_path} -- it's probably open in PowerPoint. "
+            "Close it and run this again."
+        )
 
     # Flip the saved package's content type from "presentation" to
     # "template" so it opens in PowerPoint as a .potx (New From Template).

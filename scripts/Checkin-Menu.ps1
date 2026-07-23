@@ -46,7 +46,7 @@ try {
     $libPath    = Join-Path $scriptsDir "..\lib\QRCoder.dll"
 
     if (-not (Test-Path $dbPath)) {
-        throw "Can't find the event database at $dbPath. Ask a grown-up to run Initialize-Database.ps1 first."
+        throw "Can't find the event database at $dbPath. Ask a grown-up to run scripts\setup\Initialize-Database.ps1 first."
     }
     if (-not (Test-Path $libPath)) {
         throw "Can't find QRCoder.dll at $libPath. Ask a grown-up — a file is missing from the project."
@@ -54,9 +54,9 @@ try {
     if (-not (Test-Path $outputDir)) { New-Item -ItemType Directory -Path $outputDir | Out-Null }
     Add-Type -Path $libPath
 
-    . (Join-Path $scriptsDir "Badge-Helpers.ps1")
-    . (Join-Path $scriptsDir "Data-Access.ps1")
-    . (Join-Path $scriptsDir "Checkin-Core.ps1")
+    . (Join-Path $scriptsDir "internal" "Badge-Helpers.ps1")
+    . (Join-Path $scriptsDir "internal" "Data-Access.ps1")
+    . (Join-Path $scriptsDir "internal" "Checkin-Core.ps1")
 
     $dataContext = New-DataContext -Config $config
 

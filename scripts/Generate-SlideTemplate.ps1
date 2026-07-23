@@ -26,11 +26,11 @@ param(
     [PSCustomObject]$Config
 )
 
-. "$PSScriptRoot\Resolve-EventConfig.ps1"
+. "$PSScriptRoot\internal\Resolve-EventConfig.ps1"
 $Config = Resolve-EventConfig -Config $Config
-. "$PSScriptRoot\Get-EventLogo.ps1"
-. "$PSScriptRoot\Badge-Helpers.ps1"
-. "$PSScriptRoot\Slide-Common.ps1"
+. "$PSScriptRoot\internal\Get-EventLogo.ps1"
+. "$PSScriptRoot\internal\Badge-Helpers.ps1"
+. "$PSScriptRoot\internal\Slide-Common.ps1"
 
 $slideCfg      = $Config.slideTemplate
 $outputFile    = Join-Path $PSScriptRoot ".." $slideCfg.outputFile
@@ -75,7 +75,7 @@ $manifest = @{
 $manifestPath = Join-Path $workDir "manifest.json"
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding UTF8
 
-python "$PSScriptRoot\generate_slide_template.py" $manifestPath
+python "$PSScriptRoot\internal\generate_slide_template.py" $manifestPath
 if ($LASTEXITCODE -ne 0) { throw "generate_slide_template.py failed." }
 
 Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue

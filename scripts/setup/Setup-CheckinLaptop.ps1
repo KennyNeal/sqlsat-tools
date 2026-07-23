@@ -13,14 +13,14 @@
     Assumes the sqlsat-tools repo has already been cloned or copied onto this
     laptop and this script is being run from inside it.
 .EXAMPLE
-    .\scripts\Setup-CheckinLaptop.ps1
+    .\scripts\setup\Setup-CheckinLaptop.ps1
 #>
 param(
     [switch]$SkipEventbriteToken
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = Join-Path $PSScriptRoot ".."
+$repoRoot = Join-Path $PSScriptRoot ".." ".."
 
 function Write-Step($msg) { Write-Host ""; Write-Host "==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "    OK: $msg" -ForegroundColor Green }
@@ -144,7 +144,7 @@ if (Test-Path $dbPath) {
     }
 } elseif ($config) {
     Write-Warn2 "Not found. Run:"
-    Write-Warn2 "  .\scripts\Initialize-Database.ps1 -Config `$config"
+    Write-Warn2 "  .\scripts\setup\Initialize-Database.ps1 -Config `$config"
     if ($azureEnabled) {
         Write-Warn2 "It'll be empty at first but self-populates from Azure SQL on the first"
         Write-Warn2 "Checkin-Menu.ps1 run — no need to copy event.db from another laptop."
@@ -169,7 +169,7 @@ if ($azureEnabled) {
 
     if ((Get-SecretInfo -Name $config.azure.authSecretName -ErrorAction SilentlyContinue)) {
         try {
-            . (Join-Path $repoRoot "scripts\Data-Access.ps1")
+            . (Join-Path $repoRoot "scripts\internal\Data-Access.ps1")
             $ctx = New-DataContext -Config $config
             $detail = Test-DatabaseReadiness -DataContext $ctx
             Write-Ok "Azure SQL reachable — $detail"

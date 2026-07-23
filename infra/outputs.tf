@@ -29,7 +29,7 @@ output "next_steps" {
          username: ${var.sql_admin_username}
          enabled:  true
     3. From the repo root, run:
-         .\scripts\Initialize-AzureDatabase.ps1 -Config (Get-Content .\event.config.json | ConvertFrom-Json)
+         .\scripts\setup\Initialize-AzureDatabase.ps1 -Config (Get-Content .\event.config.json | ConvertFrom-Json)
     4. If allowed_client_ips was empty, add the venue's egress IP before event day:
          az sql server firewall-rule create -g ${var.resource_group_name} -s ${var.sql_server_name} -n venue --start-ip-address <ip> --end-ip-address <ip>
   EOT

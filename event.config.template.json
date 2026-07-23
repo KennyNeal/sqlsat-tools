@@ -23,11 +23,16 @@
     "raffleTiers": ["global", "platinum", "gold", "silver"],
     "outputDir": "./output/speedpasses"
   },
+  "sponsors": {
+    "tableTiers": ["platinum", "gold", "silver"],
+    "tableExcludeSponsors": []
+  },
   "stampGame": {
-    "tiers": ["platinum", "gold", "silver"],
-    "excludeSponsors": [],
     "gridColumns": 3,
     "outputFile": "./output/stamp-game.pdf"
+  },
+  "boothSigns": {
+    "outputFile": "./output/booth-signs.pdf"
   },
   "schedule": {
     "outputFile": "./output/schedule.html",
