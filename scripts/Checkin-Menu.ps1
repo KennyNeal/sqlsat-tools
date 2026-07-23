@@ -70,6 +70,12 @@ try {
         }
     }
 
+    # Cheap insurance: a hot backup at startup, then opportunistically every
+    # few minutes in the main loop (see below). Restores the point Data-Access's
+    # auto-recovery falls back to if event.db corrupts again this desk hasn't
+    # synced to Azure yet.
+    Backup-LocalDatabase -DataContext $dataContext | Out-Null
+
     $printerName = if ($config.PSObject.Properties['badge'] -and $config.badge.walkinPrinter) {
         $config.badge.walkinPrinter
     } else {
@@ -280,6 +286,7 @@ while ($true) {
         Sync-PendingWrites -DataContext $dataContext | Out-Null
         Sync-FromAzure -DataContext $dataContext | Out-Null
     }
+    Backup-LocalDatabaseIfDue -DataContext $dataContext -IntervalMinutes 10 | Out-Null
 
     Write-Banner
     Write-Host "  [1] Check in an attendee" -ForegroundColor White

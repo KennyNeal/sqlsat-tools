@@ -258,6 +258,18 @@ Test-Check "event.db initialized" -WarnOnly {
     "$count attendees"
 }
 
+Test-Check "event.db outside a cloud-synced folder" -WarnOnly {
+    $dbFullPath = Join-Path $PSScriptRoot ".." $config.database.path
+    if (Test-Path $dbFullPath) { $dbFullPath = (Resolve-Path $dbFullPath).Path }
+    $flagged = @()
+    if ($env:OneDrive -and $dbFullPath.StartsWith($env:OneDrive, [StringComparison]::OrdinalIgnoreCase)) { $flagged += "OneDrive ($($env:OneDrive))" }
+    if ($dbFullPath -match '\\Dropbox\\') { $flagged += "Dropbox" }
+    if ($flagged) {
+        throw "repo is inside $($flagged -join ', ') — a sync client can lock/rewrite event.db while it's open and corrupt it (this happened at a past event). Move the repo to a local-only folder before event day."
+    }
+    "not inside a known sync folder"
+}
+
 Test-Check "Azure SQL (shared multi-desk store)" -WarnOnly {
     if (-not $config.PSObject.Properties['azure'] -or -not $config.azure.enabled) {
         throw "azure.enabled is false — running local-only, single-desk mode"

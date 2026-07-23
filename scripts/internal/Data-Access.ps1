@@ -32,13 +32,72 @@
 
 Import-Module PSSQLite -ErrorAction Stop
 
+# ── Local database integrity / recovery ─────────────────────────────────────
+#
+# 2026 incident: a check-in laptop's event.db returned "file is not a
+# database" partway through the event and everything local on that machine
+# (walk-ins, badge-printed marks not yet synced to Azure) was gone. The likely
+# cause is a cloud-sync tool (OneDrive/Dropbox) touching the file while SQLite
+# had it open. The functions below make that recoverable instead of fatal:
+# every context creation checks the file's integrity, and if it's corrupt,
+# quarantines it (never deletes — it may be partially salvageable) and
+# rebuilds, repopulating from Azure when available.
+
+function Test-LocalDatabaseIntegrity {
+    <#
+    .SYNOPSIS
+        Runs PRAGMA quick_check against the local db. Returns $true if the
+        file is healthy or doesn't exist yet (nothing to check), $false if
+        it's corrupt/unreadable ("file is not a database" etc.).
+    #>
+    param([Parameter(Mandatory)][string]$LocalDbPath)
+
+    if (-not (Test-Path $LocalDbPath)) { return $true }
+
+    try {
+        $result = Invoke-SqliteQuery -DataSource $LocalDbPath -Query "PRAGMA quick_check"
+        return ($result.Count -gt 0 -and $result[0].quick_check -eq 'ok')
+    } catch {
+        return $false
+    }
+}
+
+function Repair-LocalDatabase {
+    <#
+    .SYNOPSIS
+        Called when Test-LocalDatabaseIntegrity fails. Quarantines the
+        corrupt file (and any WAL sidecar files) alongside itself with a
+        timestamp suffix, then rebuilds an empty schema via
+        Initialize-Database.ps1. Never deletes the corrupt file — a human
+        can attempt recovery with the sqlite3 CLI's `.recover` later.
+    .OUTPUTS
+        Human-readable summary string.
+    #>
+    param([Parameter(Mandatory)][string]$LocalDbPath, [Parameter(Mandatory)][PSCustomObject]$Config)
+
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $quarantined = "$LocalDbPath.corrupt-$stamp"
+    Move-Item -Path $LocalDbPath -Destination $quarantined -Force
+    foreach ($ext in @('-wal', '-shm')) {
+        $sidecar = "$LocalDbPath$ext"
+        if (Test-Path $sidecar) { Move-Item -Path $sidecar -Destination "$quarantined$ext" -Force }
+    }
+
+    & (Join-Path $PSScriptRoot "Initialize-Database.ps1") -Config $Config | Out-Null
+
+    "local database was corrupt — quarantined to $quarantined and rebuilt an empty schema"
+}
+
 # ── Context ──────────────────────────────────────────────────────────────────
 
 function New-DataContext {
     <#
     .SYNOPSIS
         Builds the shared context object every Data-Access function takes.
-        Call once per script run.
+        Call once per script run. Also verifies the local db is readable
+        (auto-recovering + repopulating from Azure if not) and puts it in
+        WAL journal mode, which tolerates crashes/power loss far better than
+        the default rollback-journal mode.
     #>
     param([Parameter(Mandatory)][PSCustomObject]$Config)
 
@@ -64,7 +123,7 @@ function New-DataContext {
         }
     }
 
-    [PSCustomObject]@{
+    $context = [PSCustomObject]@{
         LocalDbPath      = $localDbPath
         AzureEnabled     = $azureEnabled
         AzureConnStr     = $azureConnStr
@@ -72,6 +131,27 @@ function New-DataContext {
         LastChecked      = [datetime]::MinValue
         ReachableTtlSecs = 15
     }
+
+    if (-not (Test-LocalDatabaseIntegrity -LocalDbPath $localDbPath)) {
+        Write-Host "  WARNING: local database at $localDbPath appears corrupt — quarantining and rebuilding..." -ForegroundColor Red
+        $detail = Repair-LocalDatabase -LocalDbPath $localDbPath -Config $Config
+        Write-Host "  $detail" -ForegroundColor Yellow
+        if ($azureEnabled -and (Test-AzureReachable -DataContext $context) -and (Sync-FromAzure -DataContext $context)) {
+            Write-Host "  Repopulated from Azure — this desk should now match every other desk." -ForegroundColor Green
+        } else {
+            Write-Host "  Could not repopulate from Azure automatically. Anything that was only on" -ForegroundColor Red
+            Write-Host "  this laptop since its last sync may be lost. Run the Azure sync menu option once online." -ForegroundColor Red
+        }
+    }
+
+    if (Test-Path $localDbPath) {
+        try {
+            Invoke-SqliteQuery -DataSource $localDbPath -Query "PRAGMA journal_mode=WAL;" | Out-Null
+            Invoke-SqliteQuery -DataSource $localDbPath -Query "PRAGMA synchronous=NORMAL;" | Out-Null
+        } catch { }
+    }
+
+    return $context
 }
 
 function Test-AzureReachable {
@@ -315,6 +395,85 @@ VALUES (@Barcode, @Path, @GeneratedAt, @EmailedAt)
     }
 }
 
+# ── Write journal (last-resort recovery aid) ────────────────────────────────
+
+function Write-LocalJournalEntry {
+    <#
+    .SYNOPSIS
+        Appends one line to a plain-text write journal in backup\ next to
+        event.db. If SQLite itself gets corrupted, this survives — it's just
+        a text file — and lets a human reconstruct what happened since the
+        last Azure sync or backup. Best-effort; never throws.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$LocalDbPath,
+        [Parameter(Mandatory)][string]$Operation,
+        [Parameter(Mandatory)][string]$Barcode,
+        [hashtable]$Detail = @{}
+    )
+    try {
+        $journalDir = Join-Path (Split-Path $LocalDbPath -Parent) "backup"
+        if (-not (Test-Path $journalDir)) { New-Item -ItemType Directory -Path $journalDir -Force | Out-Null }
+        $journalPath = Join-Path $journalDir "writes-$(Get-Date -Format 'yyyy-MM-dd').log"
+        $line = "{0:o}`t{1}`t{2}`t{3}" -f (Get-Date), $Operation, $Barcode, ($Detail | ConvertTo-Json -Compress)
+        Add-Content -Path $journalPath -Value $line
+    } catch { }
+}
+
+# ── Local database backups ───────────────────────────────────────────────────
+
+function Backup-LocalDatabase {
+    <#
+    .SYNOPSIS
+        Hot online backup of the local db via VACUUM INTO (safe to run while
+        other connections are open). Keeps the last $KeepCount backups in
+        backup\ next to event.db, pruning older ones.
+    .OUTPUTS
+        Path to the new backup file, or $null if the backup failed.
+    #>
+    param([Parameter(Mandatory)]$DataContext, [int]$KeepCount = 10)
+
+    $backupDir = Join-Path (Split-Path $DataContext.LocalDbPath -Parent) "backup"
+    if (-not (Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }
+
+    $stamp      = Get-Date -Format "yyyyMMdd-HHmmss"
+    $backupPath = Join-Path $backupDir "event-$stamp.db"
+
+    try {
+        $escaped = $backupPath -replace "'", "''"
+        Invoke-SqliteQuery -DataSource $DataContext.LocalDbPath -Query "VACUUM INTO '$escaped'" | Out-Null
+    } catch {
+        Write-Host "  Warning: local database backup failed: $_" -ForegroundColor Yellow
+        return $null
+    }
+
+    Get-ChildItem -Path $backupDir -Filter "event-*.db" |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -Skip $KeepCount |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    return $backupPath
+}
+
+function Backup-LocalDatabaseIfDue {
+    <#
+    .SYNOPSIS
+        Runs Backup-LocalDatabase only if the newest existing backup is older
+        than $IntervalMinutes (or there isn't one yet). Cheap to call
+        opportunistically in a menu loop — no extra state needed beyond the
+        backup folder's own file timestamps.
+    #>
+    param([Parameter(Mandatory)]$DataContext, [int]$IntervalMinutes = 10)
+
+    $backupDir = Join-Path (Split-Path $DataContext.LocalDbPath -Parent) "backup"
+    $newest = if (Test-Path $backupDir) {
+        Get-ChildItem -Path $backupDir -Filter "event-*.db" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    } else { $null }
+
+    if ($newest -and ((Get-Date) - $newest.LastWriteTime).TotalMinutes -lt $IntervalMinutes) { return $null }
+    return Backup-LocalDatabase -DataContext $DataContext
+}
+
 # ── Dual-store write helper ─────────────────────────────────────────────────────
 
 function Invoke-DualWrite {
@@ -334,6 +493,7 @@ function Invoke-DualWrite {
     )
 
     Invoke-SqliteQuery -DataSource $DataContext.LocalDbPath -Query $LocalQuery -SqlParameters $LocalParameters | Out-Null
+    Write-LocalJournalEntry -LocalDbPath $DataContext.LocalDbPath -Operation $Operation -Barcode $Barcode -Detail $LocalParameters
 
     if (-not $DataContext.AzureEnabled) { return }
 

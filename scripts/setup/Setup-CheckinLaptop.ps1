@@ -124,6 +124,17 @@ $config = if (Test-Path $configPath) { Get-Content -Raw $configPath | ConvertFro
 $dbPath = if ($config) { Join-Path $repoRoot $config.database.path } else { Join-Path $repoRoot "event.db" }
 $azureEnabled = $config -and $config.PSObject.Properties['azure'] -and $config.azure.enabled
 
+$repoFullPath = (Resolve-Path $repoRoot).Path
+if ($env:OneDrive -and $repoFullPath.StartsWith($env:OneDrive, [StringComparison]::OrdinalIgnoreCase)) {
+    Write-Warn2 "This repo is inside OneDrive ($($env:OneDrive)). OneDrive can sync/lock event.db while"
+    Write-Warn2 "it's open and corrupt it — this happened at a past event and the laptop lost all its"
+    Write-Warn2 "local data. Move the repo to a local-only folder (e.g. C:\sqlsat-tools) outside any"
+    Write-Warn2 "synced directory before event day."
+} elseif ($repoFullPath -match '\\Dropbox\\') {
+    Write-Warn2 "This repo is inside a Dropbox-synced folder, which carries the same corruption risk"
+    Write-Warn2 "as OneDrive. Move the repo to a local-only folder before event day."
+}
+
 if (Test-Path $dbPath) {
     Write-Ok "Found at $dbPath"
     if (-not $azureEnabled) {

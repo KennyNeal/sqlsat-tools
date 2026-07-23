@@ -20,6 +20,12 @@ if (-not (Get-Module -ListAvailable -Name PSSQLite)) {
 }
 Import-Module PSSQLite
 
+# WAL tolerates crashes/power loss far better than the default rollback
+# journal — a corrupted event.db mid-event this year lost a laptop's local
+# data entirely. See Data-Access.ps1's Test-LocalDatabaseIntegrity/Repair-LocalDatabase.
+Invoke-SqliteQuery -DataSource $dbPath -Query "PRAGMA journal_mode=WAL;" | Out-Null
+Invoke-SqliteQuery -DataSource $dbPath -Query "PRAGMA synchronous=NORMAL;" | Out-Null
+
 Invoke-SqliteQuery -DataSource $dbPath -Query @"
 CREATE TABLE IF NOT EXISTS Attendees (
     Barcode         TEXT PRIMARY KEY,
